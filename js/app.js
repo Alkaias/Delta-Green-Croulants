@@ -308,6 +308,7 @@ function mj() {
 
   <div class="box tint sec"><h2 style="margin-bottom:6px">Synchronisation Foundry</h2>
    <p>Pour <b>importer</b>, colle ici le fichier préparé par Claude depuis Foundry. Les fiches déjà importées sont mises à jour, ce qui écrase les modifications faites ici par les joueurs. <b>Exporter</b> télécharge les fiches du groupe, SAN comprise, pour les reporter dans Foundry.</p>
+   <label for="impf">Fichier d’import (.json)</label><input id="impf" type="file" accept=".json,application/json" style="margin-bottom:10px">
    <textarea id="imp" placeholder="[ { &quot;foundry_id&quot;: &quot;…&quot;, &quot;data&quot;: { … } } ]" aria-label="Données à importer"></textarea>
    <div class="row" style="margin-top:10px"><button class="primary" data-act="import">Importer dans ${esc(g.nom)}</button><button data-act="export">Exporter ${esc(g.nom)}</button></div></div>`;
 }
@@ -418,6 +419,7 @@ document.addEventListener('change', async e => {
     const a = agentById(t.dataset.portrait); if (!a || !canEdit(a) || !t.files[0]) return;
     await run(async () => { a.portrait = await imageFile(t.files[0], 360, 450, true); await api.majAgent(a.id, { portrait: a.portrait }); }, 'Photo enregistrée');
     render();
+  } else if (t.id === 'impf' && t.files[0]) { document.getElementById('imp').value = await t.files[0].text(); toast('Fichier chargé : clique sur Importer');
   } else if (t.dataset.in === 'group') { U.group = t.value; U.agent = null; U.op = null; U.filter = 'all'; render(); }
   else if (t.dataset.in === 'next') { const g = groupById(G()); g.prochaine_seance = t.value ? new Date(t.value).toISOString() : null; await run(() => api.majGroupe(g.id, { prochaine_seance: g.prochaine_seance }), 'Enregistré'); }
   else if (t.dataset.opst) { const o = opById(t.dataset.opst); o.statut = t.value; await run(() => api.majOp(o.id, { statut: o.statut }), 'Statut enregistré'); render(); }
