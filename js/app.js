@@ -5,7 +5,7 @@ const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const api = window.API_OVERRIDE || window.createApi(window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseKey));
 
 /* ------------------------------------------------------------ état */
-const D = { groupes: [], agents: [], secrets: {}, ops: [], seances: [], aides: [], notesC: {}, notePerso: '', profils: [] };
+const D = { badges: {}, groupes: [], agents: [], secrets: {}, ops: [], seances: [], aides: [], notesC: {}, notePerso: '', profils: [] };
 const U = { uid: null, profil: null, discord: '', state: 'loading', err: '', group: null, view: 'tableau', op: null, agent: null, lb: null, filter: 'all', lastLoad: 0, preview: null, savedGroup: null };
 const VIEWS = [['tableau', 'Tableau'], ['agents', 'Agents'], ['operations', 'Opérations'], ['notes', 'Notes'], ['aides', 'Aides de jeu']];
 const STATS = ['FOR', 'CON', 'DEX', 'INT', 'POU', 'CHA'];
@@ -69,6 +69,13 @@ function later(key, fn, ms = 700) {
 }
 async function run(fn, msg) { try { await fn(); if (msg) toast(msg); } catch (e) { fail(e); } }
 
+async function badgeImage(file) {
+  const bmp = await createImageBitmap(file), r = Math.min(1, 1000 / bmp.height, 800 / bmp.width);
+  const c = document.createElement('canvas'); c.width = Math.round(bmp.width * r); c.height = Math.round(bmp.height * r);
+  c.getContext('2d').drawImage(bmp, 0, 0, c.width, c.height);
+  const webp = c.toDataURL('image/webp', .86);
+  return webp.startsWith('data:image/webp') ? webp : c.toDataURL('image/png');
+}
 async function imageFile(file, maxW, maxH, crop) {
   const bmp = await createImageBitmap(file);
   let W, H, sx = 0, sy = 0, sw = bmp.width, sh = bmp.height;
@@ -218,6 +225,12 @@ function richMotiv(t) {
   return (m.length ? `<ul class="mlist">${m.map(l => { const [a, ...b] = l.split(' — '); return `<li><b>${esc(a)}</b>${b.length ? `<span>${esc(b.join(' — '))}</span>` : ''}</li>`; }).join('')}</ul>` : '')
     + (tr.length ? `<div class="troubles"><span class="tlabel">Troubles</span>${tr.map(l => `<span class="tag">${esc(l)}</span>`).join('')}</div>` : '');
 }
+function badgeBlock(a, ed) {
+  const b = D.badges[a.id];
+  if (b === undefined) { D.badges[a.id] = null; api.badge(a.id).then(img => { if (img) { D.badges[a.id] = img; if (U.view === 'agents' && U.agent === a.id) render(); } }).catch(() => {}); }
+  return `<div class="badgebox">${okImg(b) ? `<button class="badge-th" data-act="badge" data-id="${a.id}" aria-label="Voir le badge de ${esc(a.data.name)}"><img src="${esc(b)}" alt=""><span>Badge</span></button>` : ''}
+    ${ed ? `<div class="pbtns"><label class="btn small" for="bf-${a.id}">${okImg(b) ? 'Changer le badge' : 'Ajouter un badge'}</label><input class="vis" type="file" accept="image/*" id="bf-${a.id}" data-badgefile="${a.id}">${okImg(b) ? `<button class="small" data-act="delbadge" data-id="${a.id}">Retirer le badge</button>` : ''}</div>` : ''}</div>`;
+}
 function agents() {
   const list = groupAgents();
   if (!list.length) return `<h1>Agents</h1><div class="empty" style="margin-top:20px">Aucun agent dans ce groupe.${isMJ() ? ' Crée-les ou importe-les depuis l’Espace MJ.' : ''}</div>`;
@@ -238,7 +251,8 @@ function agents() {
   <div><h2 style="margin-bottom:10px">Agents</h2><ul class="list">${list.map(y => `<li><button class="pick" data-act="agent" data-id="${y.id}"${y.id === a.id ? ' aria-current="true"' : ''}>${portrait(y, 'pt')}<span><b>${esc(y.data.name)}</b><span class="sm muted">${esc(playerOf(y) || 'pas de joueur')}${y.joueur === U.uid ? ' · vous' : ''}</span></span></button></li>`).join('')}</ul></div>
   <article class="dossier">
    <div class="idcard"><div><div class="portrait">${portrait(a)}</div>
-     ${ed ? `<div class="pbtns"><label class="btn small" for="pf-${a.id}">${a.portrait ? 'Changer la photo' : 'Ajouter une photo'}</label><input class="vis" type="file" accept="image/*" id="pf-${a.id}" data-portrait="${a.id}">${a.portrait ? `<button class="small" data-act="delportrait" data-id="${a.id}">Retirer</button>` : ''}</div>` : ''}</div>
+     ${ed ? `<div class="pbtns"><label class="btn small" for="pf-${a.id}">${a.portrait ? 'Changer la photo' : 'Ajouter une photo'}</label><input class="vis" type="file" accept="image/*" id="pf-${a.id}" data-portrait="${a.id}">${a.portrait ? `<button class="small" data-act="delportrait" data-id="${a.id}">Retirer</button>` : ''}</div>` : ''}
+     ${badgeBlock(a, ed)}</div>
     <div><div class="dosno">Dossier n° ${esc(dossier)}</div>
      <div class="hd" style="margin-bottom:6px"><h1>${esc(d.name)}</h1>${stamp}</div>
      <p class="prof">${esc(d.prof) || '<span class="muted">Profession non renseignée</span>'}${playerOf(a) ? `<span class="muted"> · joué par ${esc(playerOf(a))}</span>` : ''}</p>
@@ -324,6 +338,12 @@ function aidesView() {
   ${list.length ? `<div class="board"><div class="ev">${list.map(card).join('')}</div></div>` : '<div class="empty">Aucune aide de jeu pour l’instant.</div>'}`;
 }
 function lightbox() {
+  if (U.lbBadge) {
+    const a = agentById(U.lbBadge), b = D.badges[U.lbBadge];
+    if (!a || !okImg(b)) return '';
+    return `<div class="lb" role="dialog" aria-modal="true" aria-label="Badge de ${esc(a.data.name)}"><div class="bar"><span class="typed" style="font-size:19px">Badge · ${esc(a.data.name)}</span><button data-act="lbclose">Fermer</button></div>
+     <div class="img"><img class="badge-big" src="${esc(b)}" alt="Badge de ${esc(a.data.name)}"></div><div class="bar"></div></div>`;
+  }
   if (!U.lb) return '';
   const list = groupAides().filter(h => isMJ() || h.visible);
   const i = list.findIndex(h => h.id === U.lb); if (i < 0) return '';
@@ -383,7 +403,7 @@ function render() {
 function route() {
   const h = location.hash.slice(1);
   const ok = VIEWS.some(v => v[0] === h) || (h === 'mj' && isMJ());
-  U.view = ok ? h : 'tableau'; U.lb = null; render();
+  U.view = ok ? h : 'tableau'; U.lb = null; U.lbBadge = null; render();
 }
 window.addEventListener('hashchange', route);
 
@@ -412,7 +432,9 @@ document.addEventListener('click', async e => {
     case 'openop': U.op = id; location.hash = 'operations'; return;
     case 'filter': U.filter = id; break;
     case 'lb': U.lb = id; break;
-    case 'lbclose': U.lb = null; break;
+    case 'lbclose': U.lb = null; U.lbBadge = null; break;
+    case 'badge': U.lbBadge = id; break;
+    case 'delbadge': await run(async () => { await api.delBadge(id); D.badges[id] = null; }, 'Badge retiré'); break;
     case 'add': { const a = agentById(U.agent), k = t.dataset.k; a.data[k].push(k === 'liens' ? { n: '', s: 0 } : k === 'comps' ? { n: '', v: 0 } : { n: '', c: '', d: '', p: '' }); saveAgent(a); break; }
     case 'del': { const a = agentById(t.dataset.a); a.data[t.dataset.k].splice(+t.dataset.i, 1); saveAgent(a); break; }
     case 'delportrait': { const a = agentById(id); a.portrait = null; await run(() => api.majAgent(a.id, { portrait: null }), 'Photo retirée'); break; }
@@ -439,7 +461,13 @@ document.addEventListener('click', async e => {
       let liste; try { liste = JSON.parse(document.getElementById('imp').value); if (!Array.isArray(liste)) throw new Error('Il faut une liste [ … ]'); }
       catch (err) { toast('Données illisibles : ' + err.message, true); return; }
       liste = liste.map(x => ({ ...x, groupe: x.groupe || G(), data: norm(x.data) }));
-      await run(async () => { const n = await api.importer(liste); await reload(); toast(n + ' fiche(s) importée(s)'); }); break;
+      const badges = liste.filter(x => x.foundry_id && okImg(x.badge)).map(x => [x.foundry_id, x.badge]);
+      liste = liste.map(({ badge, ...x }) => x);
+      await run(async () => {
+        const n = await api.importer(liste); await reload();
+        for (const [fid, img] of badges) { const a = D.agents.find(y => y.foundry_id === fid); if (a) { await api.setBadge(a.id, img); D.badges[a.id] = img; } }
+        toast(n + ' fiche(s) importée(s)' + (badges.length ? ', ' + badges.length + ' badge(s)' : ''));
+      }); break;
     }
     case 'export': {
       const out = groupAgents().map(a => ({ foundry_id: a.foundry_id, groupe: a.groupe, joueur: playerOf(a), data: a.data, ...(D.secrets[a.id] ? { san: D.secrets[a.id].san, san_max: D.secrets[a.id].san_max, seuil: D.secrets[a.id].seuil } : {}) }));
@@ -485,6 +513,10 @@ document.addEventListener('change', async e => {
     const a = agentById(t.dataset.portrait); if (!a || !canEdit(a) || !t.files[0]) return;
     await run(async () => { a.portrait = await imageFile(t.files[0], 360, 450, true); await api.majAgent(a.id, { portrait: a.portrait }); }, 'Photo enregistrée');
     render();
+  } else if (t.dataset.badgefile) {
+    const a = agentById(t.dataset.badgefile); if (!a || !canEdit(a) || !t.files[0]) return;
+    await run(async () => { const img = await badgeImage(t.files[0]); await api.setBadge(a.id, img); D.badges[a.id] = img; }, 'Badge enregistré');
+    render();
   } else if (t.id === 'impf' && t.files[0]) { document.getElementById('imp').value = await t.files[0].text(); toast('Fichier chargé : clique sur Importer');
   } else if (t.dataset.in === 'group') { U.group = t.value; U.agent = null; U.op = null; U.filter = 'all'; render(); }
   else if (t.dataset.in === 'next') { const g = groupById(G()); g.prochaine_seance = t.value ? new Date(t.value).toISOString() : null; await run(() => api.majGroupe(g.id, { prochaine_seance: g.prochaine_seance }), 'Enregistré'); }
@@ -492,8 +524,8 @@ document.addEventListener('change', async e => {
 });
 
 document.addEventListener('keydown', e => {
-  if (!U.lb) return;
-  if (e.key === 'Escape') { U.lb = null; render(); return; }
+  if (!U.lb && !U.lbBadge) return;
+  if (e.key === 'Escape') { U.lb = null; U.lbBadge = null; render(); return; }
   if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
     const b = [...document.querySelectorAll('.lb [data-act="lb"]')]; const btn = e.key === 'ArrowRight' ? b[1] : b[0];
     if (btn) { U.lb = btn.dataset.id; render(); }

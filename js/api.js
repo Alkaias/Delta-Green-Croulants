@@ -27,6 +27,9 @@ window.createApi = function (sb) {
     async majSecret(agent, f) { ok(await sb.from('agents_secret').update(f).eq('agent', agent)); },
     async creerAgent(groupe, data) { return ok(await sb.from('agents').insert({ groupe, data }).select().single()); },
     async supprAgent(id) { ok(await sb.from('agents').delete().eq('id', id)); },
+    async badge(agent) { const r = ok(await sb.from('agents_badges').select('image').eq('agent', agent).maybeSingle()); return r ? r.image : null; },
+    async setBadge(agent, image) { ok(await sb.from('agents_badges').upsert({ agent, image, modifie_le: now() })); },
+    async delBadge(agent) { ok(await sb.from('agents_badges').delete().eq('agent', agent)); },
     async importer(liste) { return ok(await sb.rpc('importer_agents', { p: liste })); },
 
     async operations() { return ok(await sb.from('operations').select('*').order('ordre').order('cree_le')); },

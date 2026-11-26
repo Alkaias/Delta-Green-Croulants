@@ -70,6 +70,15 @@ for k, a in d.items():
             'impuiss': [adapt.get('helplessness', {}).get(f'incident{i}', False) for i in (1, 2, 3)]}
     out.append({'foundry_id': a['_id'], 'groupe': GROUPE, 'data': data, 'portrait': portrait(a.get('img')),
                 'san': s['sanity']['value'], 'san_max': s['sanity']['max'], 'seuil': s['sanity']['currentBreakingPoint']})
+def badge(name):
+    p = IMGDIR + '/Forensic_ID_' + name.split()[-1] + '.png'
+    try: im = Image.open(p).convert('RGBA')
+    except Exception: return None
+    r = min(1, 1000 / im.height, 800 / im.width); im = im.resize((round(im.width * r), round(im.height * r)), Image.LANCZOS)
+    b = io.BytesIO(); im.save(b, 'WEBP', quality=84, method=6); return 'data:image/webp;base64,' + base64.b64encode(b.getvalue()).decode()
+for x in out:
+    bd = badge(x['data']['name'])
+    if bd: x['badge'] = bd
 out.sort(key=lambda x: x['data']['name'])
 json.dump(out, open(OUT, 'w'), ensure_ascii=False)
 for x in out:
