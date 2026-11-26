@@ -119,7 +119,7 @@ function outside() {
     <div class="row"><button class="primary" data-act="refresh">Actualiser</button><button data-act="logout">Se déconnecter</button></div>`);
   if (U.state === 'refuse') return box(`<span class="stamp">Accès refusé</span><h1 style="margin:18px 0 10px">Ce compte n’a pas accès aux archives.</h1><button data-act="logout">Se déconnecter</button>`);
   if (U.state === 'error') return box(`<span class="stamp">Erreur</span><h1 style="margin:18px 0 10px">Impossible d’ouvrir les archives.</h1><p class="muted sm">${esc(U.err)}</p><div class="row"><button class="primary" data-act="refresh">Réessayer</button><button data-act="logout">Se déconnecter</button></div>`);
-  return box(`<span class="stamp">Accès restreint</span>
+  return box(`<div class="loghead">${EMBLEM(96)}<span class="stamp">Accès restreint</span></div>
     <h1 style="margin:18px 0 8px">Archives des cellules</h1>
     <p>Dossiers des agents, comptes rendus d’opérations, notes et pièces à conviction. Identifiez-vous avec votre compte Discord.</p>
     <div style="margin-top:22px"><button class="discord" data-act="login"><svg width="22" height="16" viewBox="0 0 22 16" aria-hidden="true"><path fill="#fff" d="M18.6 1.3A18 18 0 0 0 14.1 0l-.6 1.2a16.7 16.7 0 0 0-5 0L7.9 0a18 18 0 0 0-4.5 1.3C.6 5.6-.2 9.8.2 13.9A18 18 0 0 0 5.7 16l1.1-1.8c-.6-.2-1.2-.5-1.8-.9l.4-.3a12.8 12.8 0 0 0 11.2 0l.4.3c-.6.4-1.2.7-1.8.9l1.1 1.8a18 18 0 0 0 5.5-2.1c.5-4.8-.8-8.9-3.2-12.6ZM7.4 11.4c-1.1 0-2-1-2-2.2S6.3 7 7.4 7s2 1 2 2.2-.9 2.2-2 2.2Zm7.2 0c-1.1 0-2-1-2-2.2s.9-2.2 2-2.2 2 1 2 2.2-.9 2.2-2 2.2Z"/></svg>Se connecter avec Discord</button></div>`);
@@ -131,18 +131,19 @@ function header() {
   if (U.preview) {
     const who = playerOf(me) || 'joueur non rattaché';
     return `<div class="pvbar" role="status"><span><b>Aperçu joueur</b> · ce que voit ${esc(who)} (${esc(me.data.name)}). Lecture seule.</span><button class="small" data-act="preview-off">Quitter l’aperçu</button></div>
-    <header class="top"><div class="brand">Archives des cellules<small>${esc(groupById(G()).nom)}</small></div>
+    <header class="top"><div class="brand">${EMBLEM(52)}<span>Archives des cellules<small>${esc(groupById(G()).nom)}</small></span></div>
     <span class="chip"><span class="av">${initials(who)}</span><span>${esc(who)}<br><span style="opacity:.7;font-size:13px">${esc(me.data.name)}</span></span></span></header>`;
   }
   const av = okImg(U.profil.avatar) ? `<img class="av" src="${esc(U.profil.avatar)}" alt="">` : `<span class="av"${isMJ() ? ' style="background:#b3261e"' : ''}>${isMJ() ? 'MJ' : initials(U.profil.discord)}</span>`;
-  return `<header class="top"><div class="brand">Archives des cellules<small>${isMJ() ? 'Meneur de jeu' : esc(groupById(G()).nom)}</small></div>
+  return `<div class="classif" aria-hidden="true"><span>Confidentiel · Accès restreint · Ne pas diffuser · Confidentiel · Accès restreint · Ne pas diffuser · Confidentiel · Accès restreint · Ne pas diffuser</span></div>
+  <header class="top"><div class="brand">${EMBLEM(52)}<span>Archives des cellules<small>${isMJ() ? 'Meneur de jeu' : esc(groupById(G()).nom)}</small></span></div>
    ${isMJ() ? `<label class="chip" style="margin:0">Groupe <select data-in="group" aria-label="Groupe affiché">${D.groupes.map(x => `<option value="${esc(x.id)}"${x.id === U.group ? ' selected' : ''}>${esc(x.nom)}</option>`).join('')}</select></label>` : ''}
    <span class="chip">${av}<span>${esc(U.profil.discord)}<br><span style="opacity:.7;font-size:13px">${isMJ() ? 'Accès complet' : esc(me ? me.data.name : 'Sans agent')}</span></span></span>
    <button class="small" data-act="logout">Se déconnecter</button></header>`;
 }
 function tabs() {
   const v = [...VIEWS]; if (isMJ()) v.push(['mj', 'Espace MJ']);
-  return `<nav class="tabs" aria-label="Sections">${v.map(([k, l]) => `<a href="#${k}"${k === 'mj' ? ' class="mj"' : ''}${U.view === k ? ' aria-current="page"' : ''}>${l}</a>`).join('')}</nav>`;
+  return `<nav class="tabs" aria-label="Sections">${v.map(([k, l]) => `<a href="#${k}"${k === 'mj' ? ' class="mj"' : ''}${U.view === k ? ' aria-current="page"' : ''}>${icon(TABICO[k])}${l}</a>`).join('')}</nav>`;
 }
 
 /* ------------------------------------------------------------ tableau */
@@ -176,40 +177,87 @@ function tableau() {
 function inp(a, path, val, type, extra) {
   return `<input${type === 'n' ? ' type="number" inputmode="numeric"' : ''} data-a="${a.id}" data-f="${path}" value="${esc(val)}"${canEdit(a) ? '' : ' disabled'}${extra || ''}>`;
 }
+const ICO = {
+  stats: '<rect x="4" y="4" width="7" height="7"/><rect x="13" y="4" width="7" height="7"/><rect x="4" y="13" width="7" height="7"/><rect x="13" y="13" width="7" height="7"/>',
+  pulse: '<polyline points="2 12 7 12 10 5 14 19 17 12 22 12"/>',
+  motiv: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.2"/>',
+  liens: '<path d="M10 14a4 4 0 0 1 0-5.6l2.8-2.8a4 4 0 0 1 5.6 5.6l-1.4 1.4"/><path d="M14 10a4 4 0 0 1 0 5.6l-2.8 2.8a4 4 0 0 1-5.6-5.6l1.4-1.4"/>',
+  skills: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6l1 1 2-2M4 12l1 1 2-2M4 18l1 1 2-2"/>',
+  arme: '<circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/>',
+  equip: '<rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5h6v2M3 12h18"/>',
+  bless: '<rect x="4" y="4" width="16" height="16" rx="3"/><path d="M12 8v8M8 12h8"/>',
+  bio: '<path d="M6 3h9l4 4v14H6z"/><path d="M15 3v4h4M9 12h7M9 16h7"/>',
+  person: '<circle cx="12" cy="8" r="4"/><path d="M4 21c1-4.5 4.5-7 8-7s7 2.5 8 7"/>',
+  pen: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>',
+  photo: '<rect x="3" y="5" width="18" height="14" rx="1"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/>',
+  key: '<circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v3M21 12v2"/>',
+};
+const TABICO = { tableau: 'stats', agents: 'person', operations: 'motiv', notes: 'pen', aides: 'photo', mj: 'key' };
+const EMBLEM = s => `<svg class="emblem" width="${s}" height="${s}" viewBox="0 0 120 120" aria-hidden="true"><defs><path id="ring" d="M60 60 m-44 0 a44 44 0 1 1 88 0 a44 44 0 1 1 -88 0"/></defs>
+ <circle cx="60" cy="60" r="57" fill="none" stroke="currentColor" stroke-width="3"/><circle cx="60" cy="60" r="50" fill="none" stroke="currentColor" stroke-width="1"/>
+ <circle cx="60" cy="60" r="33" fill="none" stroke="currentColor" stroke-width="2"/>
+ <text font-family="Special Elite,monospace" font-size="10.5" fill="currentColor" letter-spacing="1.2"><textPath href="#ring">ARCHIVES DES CELLULES · ACCÈS RESTREINT ·</textPath></text>
+ <path d="M42 48h13l4 5h19v23H42z" fill="currentColor" opacity=".9"/><path d="M42 56h36" stroke="var(--embg,#3a4733)" stroke-width="2"/>
+ <circle cx="60" cy="64" r="3.2" fill="var(--embg,#3a4733)"/><path d="M58.6 66h2.8l1 6h-4.8z" fill="var(--embg,#3a4733)"/>
+ <path d="M60 30l1.8 3.7 4 .6-2.9 2.8.7 4-3.6-1.9-3.6 1.9.7-4-2.9-2.8 4-.6z" fill="currentColor"/></svg>`;
+const icon = k => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${ICO[k]}</svg>`;
+const panel = (k, title, body, cls) => `<section class="panel ${cls || ''}"><h3 class="ph">${icon(k)}<span>${title}</span></h3><div class="pb">${body}</div></section>`;
+function richMotiv(t) {
+  let mode = 'm'; const m = [], tr = [];
+  String(t || '').split('\n').map(l => l.trim()).filter(Boolean).forEach(l => {
+    if (/^troubles?\s*:?$/i.test(l)) { mode = 't'; return; }
+    (mode === 'm' ? m : tr).push(l);
+  });
+  if (!m.length && !tr.length) return '<p class="muted sm">Rien d’indiqué.</p>';
+  return (m.length ? `<ul class="mlist">${m.map(l => { const [a, ...b] = l.split(' — '); return `<li><b>${esc(a)}</b>${b.length ? `<span>${esc(b.join(' — '))}</span>` : ''}</li>`; }).join('')}</ul>` : '')
+    + (tr.length ? `<div class="troubles"><span class="tlabel">Troubles</span>${tr.map(l => `<span class="tag">${esc(l)}</span>`).join('')}</div>` : '');
+}
 function agents() {
   const list = groupAgents();
   if (!list.length) return `<h1>Agents</h1><div class="empty" style="margin-top:20px">Aucun agent dans ce groupe.${isMJ() ? ' Crée-les ou importe-les depuis l’Espace MJ.' : ''}</div>`;
   if (!U.agent || !list.some(a => a.id === U.agent)) U.agent = (myAgent() && myAgent().groupe === G() ? myAgent() : list[0]).id;
   const a = agentById(U.agent), d = a.data, ed = canEdit(a), s = D.secrets[a.id];
-  const ta = (path, lbl) => `<div><label for="f-${path}">${lbl}</label><textarea id="f-${path}" data-a="${a.id}" data-f="${path}"${ed ? '' : ' disabled'}>${esc(d[path])}</textarea></div>`;
+  const area = (path, ph) => ed ? `<textarea class="ruled" id="f-${path}" data-a="${a.id}" data-f="${path}" placeholder="${ph || ''}" aria-label="${path}">${esc(d[path])}</textarea>`
+    : (d[path] ? `<div class="ro-text">${esc(d[path])}</div>` : '<p class="muted sm">Rien d’indiqué.</p>');
   const x = (k, i) => ed ? `<button class="x" data-act="del" data-a="${a.id}" data-k="${k}" data-i="${i}" aria-label="Supprimer">×</button>` : '';
+  const meter = (l, c, m) => `<div class="vital"><div class="vl"><span>${l}</span><b class="val">${c} / ${m}</b></div><div class="meter${c <= 2 ? ' bad' : ''}"><i style="width:${m > 0 ? Math.max(0, Math.min(100, c / m * 100)) : 0}%"></i></div></div>`;
+  const stamp = U.preview && a.id === U.preview ? '<span class="stamp ok">Son dossier · modifiable par lui</span>' : ed ? (isMJ() ? '<span class="stamp">Édition MJ</span>' : '<span class="stamp ok">Votre dossier</span>') : '<span class="stamp dim">Lecture seule</span>';
+  const dossier = String(a.foundry_id || a.id).replace(/[^a-z0-9]/gi, '').slice(0, 6).toUpperCase();
+  const liens = d.liens.length || ed ? `<ul class="bonds">${d.liens.map((l, i) => ed
+      ? `<li class="bond"><input class="score" type="number" data-a="${a.id}" data-f="liens.${i}.s" value="${esc(l.s)}" aria-label="Score"><textarea class="bn-ed" rows="2" data-a="${a.id}" data-f="liens.${i}.n" aria-label="Lien">${esc(l.n)}</textarea>${x('liens', i)}</li>`
+      : `<li class="bond"><span class="score">${esc(l.s)}</span><span class="bn">${esc(l.n)}</span></li>`).join('')}</ul>${ed ? '<button class="small" data-act="add" data-k="liens">+ Lien</button>' : ''}` : '<p class="muted sm">Aucun lien.</p>';
+  const adapt = `<div class="adapt"><div class="checks"><span>Adapté à la violence</span>${d.violence.map((c, i) => `<input type="checkbox" data-a="${a.id}" data-f="violence.${i}"${c ? ' checked' : ''}${ed ? '' : ' disabled'} aria-label="Violence ${i + 1}">`).join('')}</div>
+     <div class="checks"><span>Adapté à l’impuissance</span>${d.impuiss.map((c, i) => `<input type="checkbox" data-a="${a.id}" data-f="impuiss.${i}"${c ? ' checked' : ''}${ed ? '' : ' disabled'} aria-label="Impuissance ${i + 1}">`).join('')}</div></div>`;
   return `<div class="grid side">
   <div><h2 style="margin-bottom:10px">Agents</h2><ul class="list">${list.map(y => `<li><button class="pick" data-act="agent" data-id="${y.id}"${y.id === a.id ? ' aria-current="true"' : ''}>${portrait(y, 'pt')}<span><b>${esc(y.data.name)}</b><span class="sm muted">${esc(playerOf(y) || 'pas de joueur')}${y.joueur === U.uid ? ' · vous' : ''}</span></span></button></li>`).join('')}</ul></div>
-  <article>
+  <article class="dossier">
    <div class="idcard"><div><div class="portrait">${portrait(a)}</div>
      ${ed ? `<div class="pbtns"><label class="btn small" for="pf-${a.id}">${a.portrait ? 'Changer la photo' : 'Ajouter une photo'}</label><input class="vis" type="file" accept="image/*" id="pf-${a.id}" data-portrait="${a.id}">${a.portrait ? `<button class="small" data-act="delportrait" data-id="${a.id}">Retirer</button>` : ''}</div>` : ''}</div>
-    <div><div class="hd"><div><h1>${esc(d.name)}</h1><p class="muted" style="margin:.3em 0 0">${esc(d.prof)}${playerOf(a) ? ' · joué par ' + esc(playerOf(a)) : ''}</p></div>
-     ${U.preview && a.id === U.preview ? '<span class="stamp ok">Son dossier · modifiable par lui</span>' : ed ? (isMJ() ? '<span class="stamp">Édition MJ</span>' : '<span class="stamp ok">Votre dossier</span>') : '<span class="stamp dim">Lecture seule</span>'}</div>
-     <div class="grid g2"><div><label>Nom de l’agent</label>${inp(a, 'name', d.name)}</div><div><label>Profession</label>${inp(a, 'prof', d.prof)}</div></div></div></div>
-   <div class="sec"><h3>Caractéristiques</h3><div class="stats">${STATS.map(k => `<div class="stat"><label>${k}</label>${inp(a, 'stats.' + k, d.stats[k], 'n', ` aria-label="${k}"`)}<div class="x5" id="x5-${k}">×5 = ${d.stats[k] * 5}</div></div>`).join('')}</div></div>
-   <div class="sec"><h3>Attributs dérivés</h3><div class="derived">
-    <div><label>Points de vie</label><div class="pair">${inp(a, 'pv.cur', d.pv.cur, 'n', ' aria-label="PV actuels"')}<span>/</span>${inp(a, 'pv.max', d.pv.max, 'n', ' aria-label="PV max"')}</div></div>
-    <div><label>Volonté</label><div class="pair">${inp(a, 'vol.cur', d.vol.cur, 'n', ' aria-label="VOL actuelle"')}<span>/</span>${inp(a, 'vol.max', d.vol.max, 'n', ' aria-label="VOL max"')}</div></div>
-    <div><label>Santé mentale</label>${isMJ() && s ? `<div class="pair"><input type="number" data-secret="${a.id}" data-f="san" value="${s.san}" aria-label="SAN"><span>/</span><input type="number" data-secret="${a.id}" data-f="san_max" value="${s.san_max}" aria-label="SAN max"></div>` : '<span class="redact">CLASSIFIÉ</span>'}</div>
-    <div><label>Seuil de rupture</label>${isMJ() && s ? `<input type="number" data-secret="${a.id}" data-f="seuil" value="${s.seuil}" aria-label="Seuil de rupture">` : '<span class="redact">CLASSIFIÉ</span>'}</div>
-   </div>${isMJ() ? '' : '<p class="sm muted" style="margin:10px 0 0">La santé mentale et le seuil de rupture sont tenus par le meneur.</p>'}</div>
-   <div class="sec grid g2">${ta('motiv', 'Motivations et troubles mentaux')}
-    <div><label>Liens</label>${d.liens.map((l, i) => `<div class="sk${ed ? '' : ' ro'}">${inp(a, `liens.${i}.n`, l.n, '', ' aria-label="Lien"')}${inp(a, `liens.${i}.s`, l.s, 'n', ' aria-label="Score"')}${x('liens', i)}</div>`).join('') || '<p class="muted sm">Aucun lien.</p>'}
-     ${ed ? '<button class="small" data-act="add" data-k="liens" style="margin-top:8px">+ Lien</button>' : ''}
-     <div style="margin-top:14px" class="sm"><div class="checks">Adapté à la violence ${d.violence.map((c, i) => `<input type="checkbox" data-a="${a.id}" data-f="violence.${i}"${c ? ' checked' : ''}${ed ? '' : ' disabled'} aria-label="Violence ${i + 1}">`).join('')}</div>
-     <div class="checks" style="margin-top:6px">Adapté à l’impuissance ${d.impuiss.map((c, i) => `<input type="checkbox" data-a="${a.id}" data-f="impuiss.${i}"${c ? ' checked' : ''}${ed ? '' : ' disabled'} aria-label="Impuissance ${i + 1}">`).join('')}</div></div></div></div>
-   <div class="sec"><h3>Compétences</h3><div class="skills">${d.comps.map((c, i) => `<div class="sk${ed ? '' : ' ro'}">${inp(a, `comps.${i}.n`, c.n, '', ' aria-label="Compétence"')}${inp(a, `comps.${i}.v`, c.v, 'n', ' aria-label="Pourcentage"')}${x('comps', i)}</div>`).join('')}</div>
-    ${ed ? '<button class="small" data-act="add" data-k="comps" style="margin-top:10px">+ Compétence</button>' : ''}</div>
-   <div class="sec"><h3>Armes</h3>${d.armes.length ? `<div class="weap${ed ? '' : ' ro'} sm muted"><span>Arme</span><span>Compétence</span><span>Dégâts</span><span>Portée</span></div>` : ''}
-    ${d.armes.map((w, i) => `<div class="weap${ed ? '' : ' ro'}">${inp(a, `armes.${i}.n`, w.n, '', ' aria-label="Arme"')}${inp(a, `armes.${i}.c`, w.c, '', ' aria-label="Compétence"')}${inp(a, `armes.${i}.d`, w.d, '', ' aria-label="Dégâts"')}${inp(a, `armes.${i}.p`, w.p, '', ' aria-label="Portée"')}${x('armes', i)}</div>`).join('') || '<p class="muted sm">Aucune arme.</p>'}
-    ${ed ? '<button class="small" data-act="add" data-k="armes" style="margin-top:6px">+ Arme</button>' : ''}</div>
-   <div class="sec grid g2">${ta('equip', 'Équipement')}${ta('bless', 'Blessures et séquelles')}</div>
-   <div class="sec">${ta('bio', 'Historique et notes de l’agent')}</div>
+    <div><div class="dosno">Dossier n° ${esc(dossier)} · ${esc(groupById(a.groupe).nom)}</div>
+     <div class="hd" style="margin-bottom:6px"><h1>${esc(d.name)}</h1>${stamp}</div>
+     <p class="prof">${esc(d.prof) || '<span class="muted">Profession non renseignée</span>'}${playerOf(a) ? `<span class="muted"> · joué par ${esc(playerOf(a))}</span>` : ''}</p>
+     <div class="vitals">${meter('Points de vie', d.pv.cur, d.pv.max)}${meter('Volonté', d.vol.cur, d.vol.max)}
+      ${isMJ() && s ? meter('Santé mentale', s.san, s.san_max) : '<div class="vital"><div class="vl"><span>Santé mentale</span></div><span class="redact">CLASSIFIÉ</span></div>'}</div>
+     ${ed ? `<details class="idedit"><summary>Modifier le nom et la profession</summary><div class="grid g2"><div><label>Nom de l’agent</label>${inp(a, 'name', d.name)}</div><div><label>Profession</label>${inp(a, 'prof', d.prof)}</div></div></details>` : ''}</div></div>
+   <div class="sheetgrid">
+    ${panel('stats', 'Caractéristiques', `<div class="stats">${STATS.map(k => `<div class="stat"><label>${k}</label>${inp(a, 'stats.' + k, d.stats[k], 'n', ` aria-label="${k}"`)}<div class="x5" id="x5-${k}">×5 = ${d.stats[k] * 5}</div></div>`).join('')}</div>`, 'wide')}
+    ${panel('pulse', 'Attributs dérivés', `<div class="derived">
+     <div><label>Points de vie</label><div class="pair">${inp(a, 'pv.cur', d.pv.cur, 'n', ' aria-label="PV actuels"')}<span>/</span>${inp(a, 'pv.max', d.pv.max, 'n', ' aria-label="PV max"')}</div></div>
+     <div><label>Volonté</label><div class="pair">${inp(a, 'vol.cur', d.vol.cur, 'n', ' aria-label="VOL actuelle"')}<span>/</span>${inp(a, 'vol.max', d.vol.max, 'n', ' aria-label="VOL max"')}</div></div>
+     <div><label>Santé mentale</label>${isMJ() && s ? `<div class="pair"><input type="number" data-secret="${a.id}" data-f="san" value="${s.san}" aria-label="SAN"><span>/</span><input type="number" data-secret="${a.id}" data-f="san_max" value="${s.san_max}" aria-label="SAN max"></div>` : '<span class="redact">CLASSIFIÉ</span>'}</div>
+     <div><label>Seuil de rupture</label>${isMJ() && s ? `<input type="number" data-secret="${a.id}" data-f="seuil" value="${s.seuil}" aria-label="Seuil de rupture">` : '<span class="redact">CLASSIFIÉ</span>'}</div>
+    </div>${adapt}`, 'wide')}
+    ${panel('motiv', 'Motivations et troubles', ed ? area('motiv', 'Une motivation par ligne. Écrire « Troubles : » puis un trouble par ligne.') : richMotiv(d.motiv), 'm')}
+    ${panel('liens', 'Liens', liens, 'l')}
+    ${panel('skills', 'Compétences', `<div class="skills">${d.comps.map((c, i) => `<div class="sk${ed ? '' : ' ro'}">${inp(a, `comps.${i}.n`, c.n, '', ' aria-label="Compétence"')}${inp(a, `comps.${i}.v`, c.v, 'n', ' aria-label="Pourcentage"')}${x('comps', i)}</div>`).join('')}</div>
+      ${ed ? '<button class="small" data-act="add" data-k="comps" style="margin-top:10px">+ Compétence</button>' : ''}`, 'wide')}
+    ${panel('arme', 'Armes', `${d.armes.length ? `<div class="weap${ed ? '' : ' ro'} sm muted"><span>Arme</span><span>Compétence</span><span>Dégâts</span><span>Portée</span></div>` : ''}
+      ${d.armes.map((w, i) => `<div class="weap${ed ? '' : ' ro'}">${inp(a, `armes.${i}.n`, w.n, '', ' aria-label="Arme"')}${inp(a, `armes.${i}.c`, w.c, '', ' aria-label="Compétence"')}${inp(a, `armes.${i}.d`, w.d, '', ' aria-label="Dégâts"')}${inp(a, `armes.${i}.p`, w.p, '', ' aria-label="Portée"')}${x('armes', i)}</div>`).join('') || '<p class="muted sm">Aucune arme.</p>'}
+      ${ed ? '<button class="small" data-act="add" data-k="armes" style="margin-top:6px">+ Arme</button>' : ''}`, 'wide')}
+    ${panel('equip', 'Équipement', area('equip', 'Un objet par ligne'), 'm')}
+    ${panel('bless', 'Blessures et séquelles', area('bless', 'Blessures en cours, séquelles…'), 'l red')}
+    ${panel('bio', 'Historique et notes', area('bio', 'Origines, carrière, faits marquants…'), 'wide')}
+   </div>
   </article></div>`;
 }
 
