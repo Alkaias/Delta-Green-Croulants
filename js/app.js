@@ -307,7 +307,7 @@ function operations() {
   if (!mj) return `<div class="grid side">${side}<article class="opdoc">${head}
     ${o.resume ? panel('bio', 'Synthèse de l’opération', `<div class="ro-text plain">${esc(o.resume)}</div>`, 'brass') : ''}
     <h2 class="subh">Rapports de séance</h2>
-    ${ss.length ? ss.slice().reverse().map(s => `<article class="report"><div class="rh"><span>Rapport de séance n°${s.numero}</span><span>${fmtD(s.date)}</span></div><div class="rb">${esc(s.compte_rendu)}</div></article>`).join('') : '<p class="muted">Aucun rapport pour l’instant.</p>'}
+    ${ss.length ? ss.map(s => `<article class="report"><div class="rh"><span>Rapport de séance n°${s.numero}</span><span>${fmtD(s.date)}</span></div><div class="rb">${esc(s.compte_rendu)}</div></article>`).join('') : '<p class="muted">Aucun rapport pour l’instant.</p>'}
     ${piecesHtml}</article></div>`;
   return `<div class="grid side">${side}<article class="opdoc">${head}
     ${panel('bio', 'Fiche de l’opération', `<div class="mjbar"><div style="flex:3 1 260px"><label for="op-t">Titre</label><input id="op-t" class="edit-title" data-op="${o.id}" data-of="titre" value="${esc(o.titre)}"></div>
@@ -316,7 +316,7 @@ function operations() {
       <div style="flex:0 0 auto"><button class="small danger" data-act="delop" data-id="${o.id}" data-confirm>Supprimer l’opération</button></div></div>
      <label for="op-r">Synthèse (à remplir quand l’opération est classée)</label><textarea class="ruled" id="op-r" data-op="${o.id}" data-of="resume">${esc(o.resume)}</textarea>`, 'brass')}
     <div class="hd" style="margin-top:26px"><h2 class="subh" style="margin:0">Rapports de séance</h2><button class="primary" data-act="addseance" data-id="${o.id}">+ Nouveau rapport</button></div>
-    ${ss.length ? ss.slice().reverse().map(s => `<article class="report"><div class="rh ed"><span class="row">Rapport n°<input type="number" data-se="${s.id}" data-sf="numero" value="${s.numero}" aria-label="Numéro"></span>
+    ${ss.length ? ss.map(s => `<article class="report"><div class="rh ed"><span class="row">Rapport n°<input type="number" data-se="${s.id}" data-sf="numero" value="${s.numero}" aria-label="Numéro"></span>
       <span class="row"><input type="date" data-se="${s.id}" data-sf="date" value="${esc(s.date || '')}" aria-label="Date"><button class="small danger" data-act="delseance" data-id="${s.id}" data-confirm>Supprimer</button></span></div>
       <textarea class="ruled rb" data-se="${s.id}" data-sf="compte_rendu" aria-label="Compte rendu" placeholder="Ce qui s’est passé pendant la séance…">${esc(s.compte_rendu)}</textarea></article>`).join('') : '<p class="muted">Aucun rapport.</p>'}
     ${piecesHtml}</article></div>`;
