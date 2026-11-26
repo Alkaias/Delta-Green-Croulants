@@ -156,21 +156,24 @@ function vit(a) {
 function tableau() {
   const g = groupById(G()), cur = groupOps().find(o => o.statut === 'en_cours');
   const ss = cur ? seancesOf(cur.id) : [], last = ss[ss.length - 1];
-  const me = !isMJ() && myAgent();
-  const recent = groupAides().filter(h => h.visible).slice(-3).reverse();
+  const me = !isMJ() && myAgent(), team = groupAgents();
+  const recent = groupAides().filter(h => h.visible).slice(-4).reverse();
+  const nd = g.prochaine_seance ? new Date(g.prochaine_seance) : null;
+  const cal = nd ? `<div class="cal"><span class="cm">${esc(nd.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }))}</span><span class="cd">${nd.getDate()}</span><span class="cw">${esc(nd.toLocaleDateString('fr-FR', { weekday: 'long' }))} · ${esc(nd.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }))}</span></div>`
+                 : '<div class="cal off"><span class="cm">Date</span><span class="cd">?</span><span class="cw">à fixer</span></div>';
+  const mission = cur ? `<div class="hd" style="margin-bottom:4px"><h2 class="mt">${esc(cur.titre)}</h2>${statusStamp(cur.statut)}</div>${cur.periode ? `<p class="muted sm" style="margin:0 0 12px">${esc(cur.periode)}</p>` : ''}
+     ${last ? `<div class="report"><div class="rh"><span>Rapport de séance n°${last.numero}</span><span>${last.date ? fmtD(last.date) : ''}</span></div><div class="rb clip">${esc(last.compte_rendu)}</div></div>` : '<p class="muted">Aucune séance pour l’instant.</p>'}
+     <button class="primary" data-act="openop" data-id="${cur.id}" style="margin-top:14px">Ouvrir le dossier complet</button>` : '<div class="empty">Aucune opération en cours.</div>';
+  const acard = a => `<button class="acard" data-act="goagent" data-id="${a.id}">${portrait(a, 'pt lg')}<span class="an"><b>${esc(a.data.name)}</b><span class="sm muted">${esc(a.data.prof)}</span>${vit(a)}</span></button>`;
+  const agentsBody = me ? `${acard(me)}${team.length > 1 ? `<h4 class="subh4">Le reste de la cellule</h4><div class="mates">${team.filter(a => a.id !== me.id).map(a => `<button class="mate" data-act="goagent" data-id="${a.id}">${portrait(a, 'pt')}<span>${esc(a.data.name)}</span></button>`).join('')}</div>` : ''}`
+    : (team.length ? `<div class="acards">${team.map(acard).join('')}</div>` : '<p class="muted">Aucun agent.</p>');
   return `<div class="hd"><h1>${esc(g.nom)}</h1><span class="muted sm">${esc(g.monde)}</span></div>
-  <div class="grid g2" style="grid-template-columns:minmax(0,1.6fr) minmax(0,1fr)">
-   <div class="box tint">${cur ? `<div class="hd"><h2>${esc(cur.titre)}</h2>${statusStamp(cur.statut)}</div>
-     ${last ? `<p class="sm muted">Dernière séance : n°${last.numero}${last.date ? ', ' + fmtD(last.date) : ''}</p><p style="white-space:pre-line">${esc(last.compte_rendu)}</p>` : '<p class="muted">Aucune séance pour l’instant.</p>'}
-     <button data-act="openop" data-id="${cur.id}">Lire tout le dossier</button>` : '<div class="empty">Aucune opération en cours.</div>'}</div>
-   <div class="grid" style="align-content:start">
-    <div class="box"><h3>Prochaine séance</h3>
-     ${isMJ() ? `<input type="datetime-local" data-in="next" value="${esc(toLocalInput(g.prochaine_seance))}" aria-label="Date de la prochaine séance" style="margin-top:8px">`
-              : `<p class="val" style="font-size:19px;margin:.4em 0 0">${g.prochaine_seance ? esc(fmtDT(g.prochaine_seance)) : 'À fixer'}</p>`}</div>
-    ${me ? `<div class="box"><div class="hd" style="margin-bottom:8px"><span class="row">${portrait(me, 'pt')}<h3>${esc(me.data.name)}</h3></span><a href="#agents" class="sm">Ma fiche</a></div>${vit(me)}</div>`
-         : `<div class="box"><h3 style="margin-bottom:8px">Agents</h3>${groupAgents().length ? `<ul class="list">${groupAgents().map(a => `<li style="padding:8px 0"><span class="row">${portrait(a, 'pt')}<span><b>${esc(a.data.name)}</b> <span class="sm muted">${esc(playerOf(a))}</span></span></span>${vit(a)}</li>`).join('')}</ul>` : '<p class="muted">Aucun agent.</p>'}</div>`}
-   </div></div>
-  <div class="sec"><h3>Dernières pièces versées au dossier</h3>${recent.length ? `<div class="ev">${recent.map(card).join('')}</div>` : '<div class="empty">Aucune pour l’instant.</div>'}</div>`;
+  <div class="dash">
+   ${panel('motiv', 'Opération en cours', mission, 'mission')}
+   ${panel('cal', 'Prochaine séance', cal + (isMJ() ? `<label for="nx" style="margin-top:14px">Modifier la date</label><input id="nx" type="datetime-local" data-in="next" value="${esc(toLocalInput(g.prochaine_seance))}">` : ''), 'calp')}
+   ${panel(me ? 'person' : 'team', me ? 'Votre agent' : 'Agents de la cellule', agentsBody, 'wide')}
+   ${panel('photo', 'Dernières pièces versées au dossier', recent.length ? `<div class="board"><div class="ev">${recent.map(card).join('')}</div></div>` : '<div class="empty">Aucune pour l’instant.</div>', 'wide')}
+  </div>`;
 }
 
 /* ------------------------------------------------------------ fiches */
@@ -191,6 +194,9 @@ const ICO = {
   pen: '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="M13 7l4 4"/>',
   photo: '<rect x="3" y="5" width="18" height="14" rx="1"/><circle cx="9" cy="10" r="2"/><path d="M21 16l-5-5-8 8"/>',
   key: '<circle cx="8" cy="12" r="4"/><path d="M12 12h9M18 12v3M21 12v2"/>',
+  cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+  sync: '<path d="M4 12a8 8 0 0 1 14-5l2 2M20 12a8 8 0 0 1-14 5l-2-2"/><path d="M20 4v5h-5M4 20v-5h5"/>',
+  team: '<circle cx="9" cy="8" r="3.5"/><circle cx="17" cy="9" r="2.5"/><path d="M2.5 20c.8-4 3.4-6 6.5-6s5.7 2 6.5 6M15 14.5c2.6 0 4.8 1.6 5.5 5"/>',
 };
 const TABICO = { tableau: 'stats', agents: 'person', operations: 'motiv', notes: 'pen', aides: 'photo', mj: 'key' };
 const EMBLEM = s => `<svg class="emblem" width="${s}" height="${s}" viewBox="0 0 120 120" aria-hidden="true"><defs><path id="ring" d="M60 60 m-44 0 a44 44 0 1 1 88 0 a44 44 0 1 1 -88 0"/></defs>
@@ -233,7 +239,7 @@ function agents() {
   <article class="dossier">
    <div class="idcard"><div><div class="portrait">${portrait(a)}</div>
      ${ed ? `<div class="pbtns"><label class="btn small" for="pf-${a.id}">${a.portrait ? 'Changer la photo' : 'Ajouter une photo'}</label><input class="vis" type="file" accept="image/*" id="pf-${a.id}" data-portrait="${a.id}">${a.portrait ? `<button class="small" data-act="delportrait" data-id="${a.id}">Retirer</button>` : ''}</div>` : ''}</div>
-    <div><div class="dosno">Dossier n° ${esc(dossier)} · ${esc(groupById(a.groupe).nom)}</div>
+    <div><div class="dosno">Dossier n° ${esc(dossier)}</div>
      <div class="hd" style="margin-bottom:6px"><h1>${esc(d.name)}</h1>${stamp}</div>
      <p class="prof">${esc(d.prof) || '<span class="muted">Profession non renseignée</span>'}${playerOf(a) ? `<span class="muted"> · joué par ${esc(playerOf(a))}</span>` : ''}</p>
      <div class="vitals">${meter('Points de vie', d.pv.cur, d.pv.max)}${meter('Volonté', d.vol.cur, d.vol.max)}
@@ -267,37 +273,41 @@ function operations() {
   if (!U.op || !list.some(o => o.id === U.op)) U.op = (list.find(o => o.statut === 'en_cours') || list[0] || {}).id;
   const o = opById(U.op);
   const side = `<div><div class="hd" style="margin-bottom:12px"><h2>Opérations</h2>${mj ? '<button class="small" data-act="newop">+ Nouvelle</button>' : ''}</div>
-   ${list.length ? `<div class="tl">${list.map(x => `<div class="op${x.statut === 'en_cours' ? ' cur' : ''}${x.statut === 'verrouillee' ? ' locked' : ''}"><button data-act="op" data-id="${x.id}"${x.id === U.op ? ' aria-current="true"' : ''}><span class="typed" style="font-size:17px">${esc(x.titre)}</span><br><span class="sm muted">${esc(x.periode || '')}</span></button></div>`).join('')}</div>` : '<p class="muted">Aucune opération.</p>'}</div>`;
+   ${list.length ? `<div class="tl">${list.map(x => `<div class="op${x.statut === 'en_cours' ? ' cur' : ''}${x.statut === 'verrouillee' ? ' locked' : ''}"><button data-act="op" data-id="${x.id}"${x.id === U.op ? ' aria-current="true"' : ''}><span class="typed" style="font-size:17px">${esc(x.titre)}</span><br><span class="sm muted">${esc(x.periode || '')}${x.statut === 'verrouillee' ? ' · verrouillée' : ''}</span></button></div>`).join('')}</div>` : '<p class="muted">Aucune opération.</p>'}</div>`;
   if (!o) return `<div class="grid side">${side}<article><div class="empty">${mj ? 'Crée ta première opération avec « + Nouvelle ».' : 'Aucune opération pour l’instant.'}</div></article></div>`;
   const ss = seancesOf(o.id), pieces = groupAides().filter(h => h.operation === o.id && (mj || h.visible));
-  const piecesHtml = `<h3 style="margin-top:28px">Pièces liées</h3>${pieces.length ? `<div class="ev">${pieces.map(card).join('')}</div>` : '<p class="muted">Aucune.</p>'}`;
-  if (!mj) return `<div class="grid side">${side}<article><div class="hd"><h1>${esc(o.titre)}</h1>${statusStamp(o.statut)}</div>
-    ${o.resume ? `<div class="box tint"><h3 style="margin-bottom:6px">Résumé de l’opération</h3><p style="margin:0;white-space:pre-line">${esc(o.resume)}</p></div>` : ''}
-    ${ss.length ? `<h3 style="margin-top:24px">Comptes rendus de séance</h3>${ss.slice().reverse().map(s => `<div class="cr"><div class="typed">Séance ${s.numero}</div><div class="sm muted">${fmtD(s.date)}</div><p style="white-space:pre-line">${esc(s.compte_rendu)}</p></div>`).join('')}` : '<p class="muted" style="margin-top:20px">Aucun compte rendu pour l’instant.</p>'}
+  const piecesHtml = panel('photo', 'Pièces liées', pieces.length ? `<div class="board"><div class="ev">${pieces.map(card).join('')}</div></div>` : '<p class="muted">Aucune pièce pour cette opération.</p>');
+  const head = `<div class="dosno">Opération${o.periode ? ' · ' + esc(o.periode) : ''}</div><div class="hd"><h1>${esc(o.titre)}</h1>${statusStamp(o.statut)}</div>`;
+  if (!mj) return `<div class="grid side">${side}<article class="opdoc">${head}
+    ${o.resume ? panel('bio', 'Synthèse de l’opération', `<div class="ro-text plain">${esc(o.resume)}</div>`, 'brass') : ''}
+    <h2 class="subh">Rapports de séance</h2>
+    ${ss.length ? ss.slice().reverse().map(s => `<article class="report"><div class="rh"><span>Rapport de séance n°${s.numero}</span><span>${fmtD(s.date)}</span></div><div class="rb">${esc(s.compte_rendu)}</div></article>`).join('') : '<p class="muted">Aucun rapport pour l’instant.</p>'}
     ${piecesHtml}</article></div>`;
-  return `<div class="grid side">${side}<article>
-    <div class="mjbar"><div style="flex:3 1 260px"><label for="op-t">Titre</label><input id="op-t" class="edit-title" data-op="${o.id}" data-of="titre" value="${esc(o.titre)}"></div>
+  return `<div class="grid side">${side}<article class="opdoc">${head}
+    ${panel('bio', 'Fiche de l’opération', `<div class="mjbar"><div style="flex:3 1 260px"><label for="op-t">Titre</label><input id="op-t" class="edit-title" data-op="${o.id}" data-of="titre" value="${esc(o.titre)}"></div>
      <div><label for="op-s">Statut</label><select id="op-s" data-opst="${o.id}">${[['verrouillee', 'Verrouillée (invisible)'], ['en_cours', 'En cours'], ['terminee', 'Classée']].map(([k, l]) => `<option value="${k}"${o.statut === k ? ' selected' : ''}>${l}</option>`).join('')}</select></div></div>
-    <div class="mjbar"><div><label for="op-p">Période</label><input id="op-p" data-op="${o.id}" data-of="periode" value="${esc(o.periode)}" placeholder="ex. Depuis novembre 2026"></div>
-     <div style="flex:0 0 auto"><button class="small danger" data-act="delop" data-id="${o.id}" data-confirm>Supprimer l’opération</button></div></div>
-    <label for="op-r">Résumé (à remplir quand l’opération est classée)</label><textarea id="op-r" data-op="${o.id}" data-of="resume">${esc(o.resume)}</textarea>
-    <div class="hd" style="margin-top:26px"><h3>Comptes rendus de séance</h3><button class="small primary" data-act="addseance" data-id="${o.id}">+ Séance</button></div>
-    ${ss.length ? ss.slice().reverse().map(s => `<div class="cr-ed"><div class="row"><span class="typed">Séance</span><input type="number" data-se="${s.id}" data-sf="numero" value="${s.numero}" style="width:80px" aria-label="Numéro">
-      <input type="date" data-se="${s.id}" data-sf="date" value="${esc(s.date || '')}" style="width:auto" aria-label="Date"><button class="small danger" data-act="delseance" data-id="${s.id}" data-confirm>Supprimer</button></div>
-      <textarea data-se="${s.id}" data-sf="compte_rendu" aria-label="Compte rendu" placeholder="Ce qui s’est passé…">${esc(s.compte_rendu)}</textarea></div>`).join('') : '<p class="muted">Aucune séance.</p>'}
+     <div class="mjbar"><div><label for="op-p">Période</label><input id="op-p" data-op="${o.id}" data-of="periode" value="${esc(o.periode)}" placeholder="ex. Depuis novembre 2026"></div>
+      <div style="flex:0 0 auto"><button class="small danger" data-act="delop" data-id="${o.id}" data-confirm>Supprimer l’opération</button></div></div>
+     <label for="op-r">Synthèse (à remplir quand l’opération est classée)</label><textarea class="ruled" id="op-r" data-op="${o.id}" data-of="resume">${esc(o.resume)}</textarea>`, 'brass')}
+    <div class="hd" style="margin-top:26px"><h2 class="subh" style="margin:0">Rapports de séance</h2><button class="primary" data-act="addseance" data-id="${o.id}">+ Nouveau rapport</button></div>
+    ${ss.length ? ss.slice().reverse().map(s => `<article class="report"><div class="rh ed"><span class="row">Rapport n°<input type="number" data-se="${s.id}" data-sf="numero" value="${s.numero}" aria-label="Numéro"></span>
+      <span class="row"><input type="date" data-se="${s.id}" data-sf="date" value="${esc(s.date || '')}" aria-label="Date"><button class="small danger" data-act="delseance" data-id="${s.id}" data-confirm>Supprimer</button></span></div>
+      <textarea class="ruled rb" data-se="${s.id}" data-sf="compte_rendu" aria-label="Compte rendu" placeholder="Ce qui s’est passé pendant la séance…">${esc(s.compte_rendu)}</textarea></article>`).join('') : '<p class="muted">Aucun rapport.</p>'}
     ${piecesHtml}</article></div>`;
 }
 
 /* ------------------------------------------------------------ notes */
 function notes() {
   const c = D.notesC[G()] || { texte: '', modifie_par: '', modifie_le: null };
-  return `<div class="hd"><h1>Notes</h1></div><div class="grid g2">
-   <div class="box tint"><h2 style="margin-bottom:4px">Note du groupe</h2><p class="sm muted" id="cby">${c.modifie_par ? `Dernière modification : ${esc(c.modifie_par)}, ${esc(fmtDT(c.modifie_le))}` : 'Vide pour l’instant.'}</p>
-    <textarea data-note="commune" style="min-height:340px" aria-label="Note commune"${U.preview ? ' disabled' : ''}>${esc(c.texte)}</textarea><p class="sm muted">Visible et modifiable par tout le groupe et le meneur. Évitez d’écrire à plusieurs en même temps : le dernier enregistrement l’emporte.</p></div>
-   ${isMJ() ? `<div class="box"><h2 style="margin-bottom:4px">Carnets des joueurs</h2><p>Chaque joueur dispose d’un carnet privé, visible de lui seul sur le site.</p></div>`
-            : U.preview ? `<div class="box"><h2 style="margin-bottom:4px">Mon carnet</h2><p class="sm muted">Ici, le joueur a son carnet privé. Son contenu ne t’est pas accessible, même en aperçu.</p><div class="empty">Carnet privé</div></div>`
-            : `<div class="box"><h2 style="margin-bottom:4px">Mon carnet</h2><p class="sm muted">Privé : personne d’autre ne le voit sur le site.</p>
-    <textarea data-note="perso" style="min-height:340px" aria-label="Note personnelle">${esc(D.notePerso)}</textarea></div>`}</div>`;
+  const commune = `<p class="sm muted" id="cby" style="margin-top:0">${c.modifie_par ? `Dernière modification : ${esc(c.modifie_par)}, ${esc(fmtDT(c.modifie_le))}` : 'Vide pour l’instant.'}</p>
+    <textarea class="ruled tall" data-note="commune" aria-label="Note commune" placeholder="Pistes, noms, lieux, questions en suspens…"${U.preview ? ' disabled' : ''}>${esc(c.texte)}</textarea>
+    <p class="sm muted">Visible et modifiable par toute la cellule et le meneur. Évitez d’écrire à plusieurs en même temps : le dernier enregistrement l’emporte.</p>`;
+  const perso = isMJ() ? '<p>Chaque joueur dispose d’un carnet privé, visible de lui seul sur le site.</p>'
+    : U.preview ? '<p class="sm muted" style="margin-top:0">Ici, le joueur a son carnet privé. Son contenu ne t’est pas accessible, même en aperçu.</p><div class="empty">Carnet privé</div>'
+    : `<p class="sm muted" style="margin-top:0">Privé : personne d’autre ne le voit sur le site.</p><textarea class="ruled tall" data-note="perso" aria-label="Note personnelle" placeholder="Vos soupçons, vos secrets…">${esc(D.notePerso)}</textarea>`;
+  return `<div class="hd"><h1>Notes</h1></div><div class="sheetgrid">
+   ${panel('team', 'Note de la cellule', commune)}
+   ${panel('key', isMJ() ? 'Carnets des joueurs' : 'Mon carnet', perso, 'brass')}</div>`;
 }
 
 /* ------------------------------------------------------------ aides */
@@ -309,9 +319,9 @@ function card(h) {
 function aidesView() {
   const all = groupAides().filter(h => isMJ() || h.visible), opsWith = [...new Set(all.map(h => h.operation || ''))];
   const list = all.filter(h => U.filter === 'all' || (h.operation || '') === U.filter);
-  return `<div class="hd"><h1>Aides de jeu</h1><span class="muted sm">${all.length} pièce${all.length > 1 ? 's' : ''}${isMJ() ? ' · ajout depuis l’Espace MJ' : ''}</span></div>
+  return `<div class="hd"><h1>Pièces à conviction</h1><span class="muted sm">${all.length} pièce${all.length > 1 ? 's' : ''}${isMJ() ? ' · ajout depuis l’Espace MJ' : ''}</span></div>
   ${opsWith.length > 1 ? `<div class="row" style="margin-bottom:22px"><button class="small${U.filter === 'all' ? ' primary' : ''}" data-act="filter" data-id="all">Toutes</button>${opsWith.map(id => `<button class="small${U.filter === id ? ' primary' : ''}" data-act="filter" data-id="${esc(id)}">${esc(id ? (opById(id) || {}).titre : 'Hors opération')}</button>`).join('')}</div>` : ''}
-  ${list.length ? `<div class="ev">${list.map(card).join('')}</div>` : '<div class="empty">Aucune aide de jeu pour l’instant.</div>'}`;
+  ${list.length ? `<div class="board"><div class="ev">${list.map(card).join('')}</div></div>` : '<div class="empty">Aucune aide de jeu pour l’instant.</div>'}`;
 }
 function lightbox() {
   if (!U.lb) return '';
@@ -328,48 +338,40 @@ function mj() {
   const g = groupById(G()), ag = groupAgents(), ops = groupOps(), aides = groupAides();
   const pend = D.profils.filter(p => p.role === 'attente'), joueurs = D.profils.filter(p => p.role === 'joueur'), refus = D.profils.filter(p => p.role === 'refuse');
   const free = (D.agents.find(a => !a.joueur) || {}).id;
-  const agentOpts = D.groupes.map(gr => `<optgroup label="${esc(gr.nom)}">${D.agents.filter(a => a.groupe === gr.id).map(a => `<option value="${a.id}"${a.id === free ? ' selected' : ''}>${esc(a.data.name)}${a.joueur ? ' (' + esc(playerOf(a)) + ')' : ''}</option>`).join('')}</optgroup>`).join('');
-  return `<div class="hd"><h1>Espace MJ</h1></div>
-  <div class="box tint" style="margin-bottom:22px"><h2 style="margin-bottom:6px">Voir comme un joueur</h2><p class="sm muted" style="margin-top:0">Affiche le site tel que le voit le joueur d’un agent : sans SAN, sans opérations verrouillées ni aides cachées.</p>
-   ${D.agents.length ? `<div class="row"><select id="pv-a" aria-label="Agent" style="flex:1 1 220px">${D.groupes.map(gr => `<optgroup label="${esc(gr.nom)}">${D.agents.filter(a => a.groupe === gr.id).map(a => `<option value="${a.id}"${a.groupe === G() ? '' : ''}>${esc(a.data.name)}${a.joueur ? ' (' + esc(playerOf(a)) + ')' : ''}</option>`).join('')}</optgroup>`).join('')}</select><button class="primary small" data-act="preview-on">Voir comme ce joueur</button></div>` : '<p class="muted">Aucun agent.</p>'}</div>
-  <div class="box"><h2 style="margin-bottom:10px">Accréditations</h2>
-   ${pend.length ? pend.map(p => `<div style="margin-bottom:14px"><p style="margin:0 0 6px"><b>${esc(p.discord)}</b> <span class="sm muted">connecté le ${fmtD(p.cree_le)}</span></p>
-     ${D.agents.length ? `<div class="row"><select data-pend="${p.id}" aria-label="Rattacher à l’agent" style="flex:1 1 220px">${agentOpts}</select><button class="small primary" data-act="accr" data-id="${p.id}">Accréditer</button><button class="small danger" data-act="refuse" data-id="${p.id}" data-confirm>Refuser</button></div>` : '<p class="sm muted">Crée d’abord les agents pour pouvoir le rattacher.</p>'}</div>`).join('') : '<p class="muted">Aucune demande en attente.</p>'}
-   ${joueurs.length ? `<h3 style="margin:18px 0 8px">Joueurs accrédités</h3><table class="stack"><thead><tr><th>Discord</th><th>Agent</th><th>Groupe</th><th></th></tr></thead><tbody>${joueurs.map(p => { const a = D.agents.find(x => x.joueur === p.id); return `<tr><td>${esc(p.discord)}</td><td>${esc(a ? a.data.name : '—')}</td><td>${esc(groupById(p.groupe).nom)}</td><td class="n"><button class="small danger" data-act="retirer" data-id="${p.id}" data-confirm>Retirer l’accès</button></td></tr>`; }).join('')}</tbody></table>` : ''}
-   ${refus.length ? `<h3 style="margin:18px 0 8px">Comptes refusés</h3>${refus.map(p => `<div class="row" style="margin-bottom:6px"><span>${esc(p.discord)}</span><button class="small" data-act="retirer" data-id="${p.id}">Remettre en attente</button></div>`).join('')}` : ''}
-   <p class="sm muted">Chaque compte Discord qui se connecte arrive ici. Il ne voit rien tant que tu ne l’as pas rattaché à un agent.</p></div>
-
-  <div class="grid g2 sec">
-   <div class="box"><h2 style="margin-bottom:10px">Groupe affiché</h2>
-    <div class="grid" style="gap:12px"><div><label for="g-n">Nom</label><input id="g-n" data-g="nom" value="${esc(g.nom)}"></div><div><label for="g-m">Monde Foundry</label><input id="g-m" data-g="monde" value="${esc(g.monde)}"></div></div>
-    <p class="sm muted">Change de groupe avec le menu en haut de la page.</p></div>
-   <div class="box"><h2 style="margin-bottom:10px">Nouvel agent</h2>
-    <label for="na">Nom</label><div class="row"><input id="na" style="flex:1 1 200px" placeholder="Nom de l’agent"><button class="small primary" data-act="newagent">Créer</button></div>
-    <p class="sm muted">Il rejoint ${esc(g.nom)}. Tu pourras compléter sa fiche dans l’onglet Agents.</p></div>
-  </div>
-
-  <div class="box sec"><h2 style="margin-bottom:10px">Agents et santé mentale</h2>
-   ${ag.length ? `<table class="stack"><thead><tr><th>Agent</th><th>Joueur</th><th>SAN</th><th>Max</th><th>Seuil</th><th></th></tr></thead><tbody>${ag.map(a => { const s = D.secrets[a.id] || { san: 0, san_max: 99, seuil: 0 }; return `<tr><td>${esc(a.data.name)}</td><td>${esc(playerOf(a) || '—')}</td>
+  const opts = sel => D.groupes.map(gr => `<optgroup label="${esc(gr.nom)}">${D.agents.filter(a => a.groupe === gr.id).map(a => `<option value="${a.id}"${sel && a.id === free ? ' selected' : ''}>${esc(a.data.name)}${a.joueur ? ' (' + esc(playerOf(a)) + ')' : ''}</option>`).join('')}</optgroup>`).join('');
+  const accr = `${pend.length ? pend.map(p => `<div class="pend"><p style="margin:0 0 6px"><b>${esc(p.discord)}</b> <span class="sm muted">connecté le ${fmtD(p.cree_le)}</span></p>
+     ${D.agents.length ? `<div class="row"><select data-pend="${p.id}" aria-label="Rattacher à l’agent" style="flex:1 1 220px">${opts(true)}</select><button class="small primary" data-act="accr" data-id="${p.id}">Accréditer</button><button class="small danger" data-act="refuse" data-id="${p.id}" data-confirm>Refuser</button></div>` : '<p class="sm muted">Crée d’abord les agents pour pouvoir le rattacher.</p>'}</div>`).join('') : '<p class="muted" style="margin-top:0">Aucune demande en attente.</p>'}
+   ${joueurs.length ? `<h4 class="subh4">Joueurs accrédités</h4><table class="stack"><thead><tr><th>Discord</th><th>Agent</th><th>Groupe</th><th></th></tr></thead><tbody>${joueurs.map(p => { const a = D.agents.find(x => x.joueur === p.id); return `<tr><td>${esc(p.discord)}</td><td>${esc(a ? a.data.name : '—')}</td><td>${esc(groupById(p.groupe).nom)}</td><td class="n"><button class="small danger" data-act="retirer" data-id="${p.id}" data-confirm>Retirer l’accès</button></td></tr>`; }).join('')}</tbody></table>` : ''}
+   ${refus.length ? `<h4 class="subh4">Comptes refusés</h4>${refus.map(p => `<div class="row" style="margin-bottom:6px"><span>${esc(p.discord)}</span><button class="small" data-act="retirer" data-id="${p.id}">Remettre en attente</button></div>`).join('')}` : ''}
+   <p class="sm muted">Chaque compte Discord qui se connecte arrive ici. Il ne voit rien tant que tu ne l’as pas rattaché à un agent.</p>`;
+  const san = `${ag.length ? `<table class="stack"><thead><tr><th>Agent</th><th>Joueur</th><th>SAN</th><th>Max</th><th>Seuil</th><th></th></tr></thead><tbody>${ag.map(a => { const s = D.secrets[a.id] || { san: 0, san_max: 99, seuil: 0 }; return `<tr><td><span class="row">${portrait(a, 'pt')}${esc(a.data.name)}</span></td><td>${esc(playerOf(a) || '—')}</td>
      <td class="n"><input type="number" data-secret="${a.id}" data-f="san" value="${s.san}" style="width:80px" aria-label="SAN de ${esc(a.data.name)}"></td>
      <td class="n"><input type="number" data-secret="${a.id}" data-f="san_max" value="${s.san_max}" style="width:80px" aria-label="SAN max de ${esc(a.data.name)}"></td>
      <td class="n"><input type="number" data-secret="${a.id}" data-f="seuil" value="${s.seuil}" style="width:80px" aria-label="Seuil de ${esc(a.data.name)}"></td>
      <td class="n"><button class="small danger" data-act="delagent" data-id="${a.id}" data-confirm>Supprimer</button></td></tr>`; }).join('')}</tbody></table>` : '<p class="muted">Aucun agent dans ce groupe.</p>'}
-   <p class="sm muted">Ces valeurs ne sont jamais envoyées aux navigateurs des joueurs.</p></div>
-
-  <div class="box sec"><h2 style="margin-bottom:10px">Aides de jeu</h2>
-   <div class="mjbar"><div><label for="ah-t">Titre</label><input id="ah-t" placeholder="ex. Carte de la côte"></div>
+   <p class="sm muted">Ces valeurs ne sont jamais envoyées aux navigateurs des joueurs.</p>`;
+  const aidesHtml = `<div class="mjbar"><div><label for="ah-t">Titre</label><input id="ah-t" placeholder="ex. Carte de la côte"></div>
     <div><label for="ah-o">Opération</label><select id="ah-o"><option value="">Hors opération</option>${ops.map(o => `<option value="${o.id}"${o.id === U.op ? ' selected' : ''}>${esc(o.titre)}</option>`).join('')}</select></div>
     <div><label for="ah-f">Image</label><input id="ah-f" type="file" accept="image/*"></div>
     <div style="flex:0 0 auto"><button class="primary" data-act="addaide">Ajouter</button></div></div>
    <p class="sm muted" style="margin-top:-6px">Une nouvelle pièce est cachée aux joueurs : rends-la visible au bon moment.</p>
-   ${aides.length ? `<ul class="list">${aides.map(h => `<li class="row" style="padding:8px 0;justify-content:space-between"><span><b>${esc(h.titre)}</b><br><span class="sm muted">${esc((opById(h.operation) || {}).titre || 'Hors opération')}</span></span>
-     <span class="row"><button class="small${h.visible ? '' : ' primary'}" data-act="toggleaide" data-id="${h.id}">${h.visible ? 'Cacher' : 'Montrer aux joueurs'}</button><button class="small danger" data-act="delaide" data-id="${h.id}" data-confirm>Supprimer</button></span></li>`).join('')}</ul>` : ''}</div>
-
-  <div class="box tint sec"><h2 style="margin-bottom:6px">Synchronisation Foundry</h2>
-   <p>Pour <b>importer</b>, colle ici le fichier préparé par Claude depuis Foundry. Les fiches déjà importées sont mises à jour, ce qui écrase les modifications faites ici par les joueurs. <b>Exporter</b> télécharge les fiches du groupe, SAN comprise, pour les reporter dans Foundry.</p>
+   ${aides.length ? `<ul class="list">${aides.map(h => `<li class="row" style="padding:8px 0;justify-content:space-between"><span><b>${esc(h.titre)}</b><br><span class="sm muted">${esc((opById(h.operation) || {}).titre || 'Hors opération')}${h.visible ? ' · visible' : ' · cachée'}</span></span>
+     <span class="row"><button class="small${h.visible ? '' : ' primary'}" data-act="toggleaide" data-id="${h.id}">${h.visible ? 'Cacher' : 'Montrer aux joueurs'}</button><button class="small danger" data-act="delaide" data-id="${h.id}" data-confirm>Supprimer</button></span></li>`).join('')}</ul>` : ''}`;
+  const sync = `<p style="margin-top:0">Pour <b>importer</b>, choisis le fichier préparé par Claude depuis Foundry. Les fiches déjà importées sont mises à jour, ce qui écrase les modifications faites ici par les joueurs. <b>Exporter</b> télécharge les fiches du groupe, SAN comprise, pour les reporter dans Foundry.</p>
    <label for="impf">Fichier d’import (.json)</label><input id="impf" type="file" accept=".json,application/json" style="margin-bottom:10px">
    <textarea id="imp" placeholder="[ { &quot;foundry_id&quot;: &quot;…&quot;, &quot;data&quot;: { … } } ]" aria-label="Données à importer"></textarea>
-   <div class="row" style="margin-top:10px"><button class="primary" data-act="import">Importer dans ${esc(g.nom)}</button><button data-act="export">Exporter ${esc(g.nom)}</button></div></div>`;
+   <div class="row" style="margin-top:10px"><button class="primary" data-act="import">Importer dans ${esc(g.nom)}</button><button data-act="export">Exporter ${esc(g.nom)}</button></div>`;
+  return `<div class="hd"><h1>Espace MJ</h1><span class="muted sm">${esc(g.nom)}</span></div>
+  <div class="sheetgrid" style="margin-top:0">
+   ${panel('person', 'Voir comme un joueur', `<p class="sm muted" style="margin-top:0">Affiche le site tel que le voit le joueur d’un agent : sans SAN, sans opérations verrouillées ni aides cachées.</p>
+     ${D.agents.length ? `<div class="row"><select id="pv-a" aria-label="Agent" style="flex:1 1 220px">${opts(false)}</select><button class="primary small" data-act="preview-on">Voir comme ce joueur</button></div>` : '<p class="muted">Aucun agent.</p>'}`, 'wide brass')}
+   ${panel('key', 'Accréditations' + (pend.length ? ` <span class="badge">${pend.length}</span>` : ''), accr, 'wide')}
+   ${panel('stats', 'Groupe affiché', `<div class="grid" style="gap:12px"><div><label for="g-n">Nom</label><input id="g-n" data-g="nom" value="${esc(g.nom)}"></div><div><label for="g-m">Monde Foundry</label><input id="g-m" data-g="monde" value="${esc(g.monde)}"></div></div><p class="sm muted">Change de groupe avec le menu en haut de la page.</p>`)}
+   ${panel('person', 'Nouvel agent', `<label for="na">Nom</label><div class="row"><input id="na" style="flex:1 1 200px" placeholder="Nom de l’agent"><button class="small primary" data-act="newagent">Créer</button></div><p class="sm muted">Il rejoint ${esc(g.nom)}. Tu pourras compléter sa fiche dans l’onglet Agents.</p>`)}
+   ${panel('pulse', 'Agents et santé mentale', san, 'wide red')}
+   ${panel('photo', 'Aides de jeu', aidesHtml, 'wide')}
+   ${panel('sync', 'Synchronisation Foundry', sync, 'wide brass')}
+  </div>`;
 }
 
 /* ------------------------------------------------------------ rendu */
@@ -404,6 +406,7 @@ document.addEventListener('click', async e => {
     case 'refresh': U.state = 'loading'; render(); try { await reload(); } catch (err) { U.state = 'error'; U.err = err.message; } route(); return;
     case 'preview-on': { const a = agentById(document.getElementById('pv-a').value); if (!a) return; U.savedGroup = U.group; U.preview = a.id; U.group = a.groupe; U.agent = a.id; U.op = null; U.filter = 'all'; location.hash = 'tableau'; route(); window.scrollTo(0, 0); return; }
     case 'preview-off': U.preview = null; U.group = U.savedGroup || U.group; U.agent = null; U.op = null; U.filter = 'all'; location.hash = 'mj'; route(); return;
+    case 'goagent': U.agent = id; location.hash = 'agents'; return;
     case 'agent': U.agent = id; break;
     case 'op': U.op = id; break;
     case 'openop': U.op = id; location.hash = 'operations'; return;

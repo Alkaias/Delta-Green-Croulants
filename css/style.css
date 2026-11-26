@@ -214,3 +214,50 @@ input.score{-webkit-text-fill-color:#ecebdf}
 .bond textarea.bn-ed{min-height:0;resize:vertical;background:var(--paper);line-height:1.35;padding:6px 8px}
 .bond textarea.bn-ed{field-sizing:content;min-height:44px}
 .sheet>.grid.g2{align-items:start}
+
+/* ===================== habillage v2 : autres onglets ===================== */
+.panel.brass{border-color:var(--brass)}.panel.brass .ph{background:var(--brass);color:#fff}
+:root[data-theme=dark] .panel.brass .ph{color:#1c2118}
+.badge{display:inline-grid;place-items:center;min-width:24px;height:24px;border-radius:12px;background:var(--stamp);color:#fff;font:700 13px Archivo,sans-serif;padding:0 6px;margin-left:6px}
+.subh{font-size:24px;margin:28px 0 14px}
+.subh4{font:17px "Special Elite",monospace;margin:20px 0 10px}
+/* tableau */
+.dash{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:20px}
+.dash .wide{grid-column:1/-1}
+@media(max-width:760px){.dash{grid-template-columns:minmax(0,1fr)}}
+.mt{font-size:clamp(24px,3vw,32px)}
+.cal{display:flex;flex-direction:column;align-items:center;text-align:center;border:2px solid var(--ink);border-radius:6px;overflow:hidden;background:var(--paper)}
+.cal .cm{display:block;width:100%;background:var(--stamp);color:#fff;font:600 14px Archivo,sans-serif;padding:6px;text-transform:capitalize}
+.cal .cd{font:64px/1.05 "Special Elite",monospace;padding:10px 0 2px}
+.cal .cw{font-size:15px;color:var(--muted);padding:0 10px 12px;text-transform:capitalize}
+.cal.off .cm{background:var(--muted)}
+.acards{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.acard{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;align-items:start;text-align:start;padding:14px;min-height:0;border:1px solid var(--line);border-radius:4px;background:var(--paper2);font-weight:400;width:100%}
+.acard:hover{border-color:var(--ink)}
+.acard .an b{display:block;font:20px "Special Elite",monospace}
+.pt.lg,.pt.lg svg{width:76px;height:76px}
+img.pt.lg{width:76px;height:76px}
+.mates{display:flex;flex-wrap:wrap;gap:10px}
+.mate{min-height:52px;border-color:var(--line);font-weight:600;padding:0 14px 0 6px;border-radius:30px}
+.mate .pt{width:40px;height:40px}
+/* rapports */
+.report{border:1px solid var(--line);background:var(--paper);box-shadow:3px 3px 0 var(--line);margin-bottom:18px}
+.report .rh{display:flex;flex-wrap:wrap;justify-content:space-between;gap:6px 14px;align-items:center;padding:8px 14px;border-bottom:2px solid var(--ink);font:17px "Special Elite",monospace;background:var(--paper2)}
+.report .rh.ed input{width:auto;padding:4px 8px}.report .rh.ed input[type=number]{width:70px}
+.report .rb{padding:2px 16px 12px 22px;white-space:pre-line;font:16px/26px "Courier Prime",monospace;background-image:repeating-linear-gradient(180deg,transparent 0 25px,var(--line) 25px 26px);background-position:0 1px;border-left:2px solid light-dark(#e5a8a2,#7a3a35);margin-left:14px}
+.report textarea.rb{width:calc(100% - 14px);min-height:208px;border-radius:0;border-top:0;border-right:0;border-bottom:0}
+.report .rb.clip{max-height:236px;overflow:hidden;-webkit-mask-image:linear-gradient(180deg,#000 70%,transparent)}
+.ro-text.plain{min-height:0}
+.opdoc .panel{margin-bottom:18px}
+.tl .op button{background:var(--paper)}
+.tl .op.cur button{border-color:var(--stamp);border-width:2px}
+/* notes */
+.ruled.tall{min-height:390px}
+/* pièces à conviction */
+.board{background:light-dark(#e3dccb,#2a3026);background-image:radial-gradient(light-dark(rgba(0,0,0,.06),rgba(255,255,255,.05)) 1px,transparent 1.2px);background-size:9px 9px;padding:26px 22px 18px;border-radius:4px;box-shadow:inset 0 0 0 1px var(--line)}
+.card .ph{background:#fbfaf6;padding:10px 10px 12px;position:relative}
+.card .ph::before{content:"";position:absolute;top:-7px;left:50%;width:16px;height:16px;margin-left:-8px;border-radius:50%;background:radial-gradient(circle at 35% 35%,#ff8f85,#b3261e 60%,#6e140f);box-shadow:0 2px 3px rgba(0,0,0,.35);z-index:2}
+.card .cap b{font:17px "Special Elite",monospace;font-weight:400}
+.pend{padding:10px 0;border-bottom:1px dashed var(--line)}
+.panel .ph .badge{font-size:12px}
+.card{width:100%}.card .noimg{width:100%}
