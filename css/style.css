@@ -147,3 +147,6 @@ pre,.scroll{overflow-x:auto}
 .card img{display:block;width:100%;aspect-ratio:6/5;object-fit:cover;background:#fff}
 .lb img{max-height:74vh;max-width:min(94vw,1100px);object-fit:contain;background:#f5f2ea}
 .noimg{aspect-ratio:6/5;display:grid;place-items:center;color:var(--muted);font-size:14px;background:var(--paper)}
+
+.pvbar{position:sticky;top:0;z-index:15;display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between;background:var(--stamp);color:#fff;padding:8px max(4vw,16px);font-size:15px}
+.pvbar button{border-color:#fff;color:#fff}

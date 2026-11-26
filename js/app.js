@@ -6,22 +6,23 @@ const api = window.API_OVERRIDE || window.createApi(window.supabase.createClient
 
 /* ------------------------------------------------------------ état */
 const D = { groupes: [], agents: [], secrets: {}, ops: [], seances: [], aides: [], notesC: {}, notePerso: '', profils: [] };
-const U = { uid: null, profil: null, discord: '', state: 'loading', err: '', group: null, view: 'tableau', op: null, agent: null, lb: null, filter: 'all', lastLoad: 0 };
+const U = { uid: null, profil: null, discord: '', state: 'loading', err: '', group: null, view: 'tableau', op: null, agent: null, lb: null, filter: 'all', lastLoad: 0, preview: null, savedGroup: null };
 const VIEWS = [['tableau', 'Tableau'], ['agents', 'Agents'], ['operations', 'Opérations'], ['notes', 'Notes'], ['aides', 'Aides de jeu']];
 const STATS = ['FOR', 'CON', 'DEX', 'INT', 'POU', 'CHA'];
 const BASE_SK = [['Armes à feu', 20], ['Athlétisme', 30], ['Bureaucratie', 10], ['Combat à mains nues', 40], ['Combat au contact', 30], ['Comptabilité', 10], ['Conduite', 20], ['Criminologie', 10], ['Déguisement', 10], ['Discrétion', 10], ['Engins lourds', 10], ['Esquive', 30], ['Fouille', 20], ['Natation', 20], ['Occultisme', 10], ['Orientation', 10], ['Persuasion', 20], ['Premiers soins', 10], ['Psychothérapie', 10], ['Renseignement humain', 10], ['Survie', 10], ['Vigilance', 20]];
 
-const isMJ = () => U.profil && U.profil.role === 'mj';
+const realMJ = () => U.profil && U.profil.role === 'mj';
+const isMJ = () => realMJ() && !U.preview;
 const G = () => U.group;
 const agentById = id => D.agents.find(a => a.id === id);
 const groupById = id => D.groupes.find(g => g.id === id) || { id, nom: '—', monde: '' };
 const opById = id => D.ops.find(o => o.id === id);
-const myAgent = () => D.agents.find(a => a.joueur === U.uid);
+const myAgent = () => U.preview ? agentById(U.preview) : D.agents.find(a => a.joueur === U.uid);
 const playerOf = a => (D.profils.find(p => p.id === a.joueur) || {}).discord || '';
-const canEdit = a => isMJ() || a.joueur === U.uid;
+const canEdit = a => !U.preview && (isMJ() || a.joueur === U.uid);
 const groupAgents = () => D.agents.filter(a => a.groupe === G());
-const groupOps = () => D.ops.filter(o => o.groupe === G());
-const groupAides = () => D.aides.filter(h => h.groupe === G());
+const groupOps = () => D.ops.filter(o => o.groupe === G() && (!U.preview || o.statut !== 'verrouillee'));
+const groupAides = () => D.aides.filter(h => h.groupe === G() && (!U.preview || (h.visible && (!h.operation || (opById(h.operation) || {}).statut !== 'verrouillee'))));
 const seancesOf = id => D.seances.filter(s => s.operation === id).sort((a, b) => a.numero - b.numero);
 
 /* ------------------------------------------------------------ outils */
@@ -89,9 +90,10 @@ async function reload() {
   D.groupes = g; D.ops = o; D.seances = s; D.aides = h; D.profils = p;
   D.agents = a.map(x => ({ ...x, data: norm(x.data) })).sort((x, y) => x.data.name.localeCompare(y.data.name));
   D.notesC = Object.fromEntries(n.map(x => [x.groupe, x]));
-  if (isMJ()) { D.secrets = Object.fromEntries((await api.secrets()).map(x => [x.agent, x])); }
+  if (realMJ()) { D.secrets = Object.fromEntries((await api.secrets()).map(x => [x.agent, x])); }
   else { D.secrets = {}; const np = await api.notePerso(U.uid); D.notePerso = np ? np.texte : ''; }
-  if (isMJ()) { if (!D.groupes.some(x => x.id === U.group)) U.group = (D.groupes[0] || {}).id || null; }
+  if (U.preview && !agentById(U.preview)) { U.preview = null; U.group = U.savedGroup; }
+  if (realMJ()) { if (!D.groupes.some(x => x.id === U.group)) U.group = (D.groupes[0] || {}).id || null; }
   else U.group = U.profil.groupe;
   U.state = 'app'; U.lastLoad = Date.now();
 }
@@ -126,6 +128,12 @@ function outside() {
 /* ------------------------------------------------------------ cadre */
 function header() {
   const me = myAgent();
+  if (U.preview) {
+    const who = playerOf(me) || 'joueur non rattaché';
+    return `<div class="pvbar" role="status"><span><b>Aperçu joueur</b> · ce que voit ${esc(who)} (${esc(me.data.name)}). Lecture seule.</span><button class="small" data-act="preview-off">Quitter l’aperçu</button></div>
+    <header class="top"><div class="brand">Archives des cellules<small>${esc(groupById(G()).nom)}</small></div>
+    <span class="chip"><span class="av">${initials(who)}</span><span>${esc(who)}<br><span style="opacity:.7;font-size:13px">${esc(me.data.name)}</span></span></span></header>`;
+  }
   const av = okImg(U.profil.avatar) ? `<img class="av" src="${esc(U.profil.avatar)}" alt="">` : `<span class="av"${isMJ() ? ' style="background:#b3261e"' : ''}>${isMJ() ? 'MJ' : initials(U.profil.discord)}</span>`;
   return `<header class="top"><div class="brand">Archives des cellules<small>${isMJ() ? 'Meneur de jeu' : esc(groupById(G()).nom)}</small></div>
    ${isMJ() ? `<label class="chip" style="margin:0">Groupe <select data-in="group" aria-label="Groupe affiché">${D.groupes.map(x => `<option value="${esc(x.id)}"${x.id === U.group ? ' selected' : ''}>${esc(x.nom)}</option>`).join('')}</select></label>` : ''}
@@ -181,7 +189,7 @@ function agents() {
    <div class="idcard"><div><div class="portrait">${portrait(a)}</div>
      ${ed ? `<div class="pbtns"><label class="btn small" for="pf-${a.id}">${a.portrait ? 'Changer la photo' : 'Ajouter une photo'}</label><input class="vis" type="file" accept="image/*" id="pf-${a.id}" data-portrait="${a.id}">${a.portrait ? `<button class="small" data-act="delportrait" data-id="${a.id}">Retirer</button>` : ''}</div>` : ''}</div>
     <div><div class="hd"><div><h1>${esc(d.name)}</h1><p class="muted" style="margin:.3em 0 0">${esc(d.prof)}${playerOf(a) ? ' · joué par ' + esc(playerOf(a)) : ''}</p></div>
-     ${ed ? (isMJ() ? '<span class="stamp">Édition MJ</span>' : '<span class="stamp ok">Votre dossier</span>') : '<span class="stamp dim">Lecture seule</span>'}</div>
+     ${U.preview && a.id === U.preview ? '<span class="stamp ok">Son dossier · modifiable par lui</span>' : ed ? (isMJ() ? '<span class="stamp">Édition MJ</span>' : '<span class="stamp ok">Votre dossier</span>') : '<span class="stamp dim">Lecture seule</span>'}</div>
      <div class="grid g2"><div><label>Nom de l’agent</label>${inp(a, 'name', d.name)}</div><div><label>Profession</label>${inp(a, 'prof', d.prof)}</div></div></div></div>
    <div class="sec"><h3>Caractéristiques</h3><div class="stats">${STATS.map(k => `<div class="stat"><label>${k}</label>${inp(a, 'stats.' + k, d.stats[k], 'n', ` aria-label="${k}"`)}<div class="x5" id="x5-${k}">×5 = ${d.stats[k] * 5}</div></div>`).join('')}</div></div>
    <div class="sec"><h3>Attributs dérivés</h3><div class="derived">
@@ -237,8 +245,9 @@ function notes() {
   const c = D.notesC[G()] || { texte: '', modifie_par: '', modifie_le: null };
   return `<div class="hd"><h1>Notes</h1></div><div class="grid g2">
    <div class="box tint"><h2 style="margin-bottom:4px">Note du groupe</h2><p class="sm muted" id="cby">${c.modifie_par ? `Dernière modification : ${esc(c.modifie_par)}, ${esc(fmtDT(c.modifie_le))}` : 'Vide pour l’instant.'}</p>
-    <textarea data-note="commune" style="min-height:340px" aria-label="Note commune">${esc(c.texte)}</textarea><p class="sm muted">Visible et modifiable par tout le groupe et le meneur. Évitez d’écrire à plusieurs en même temps : le dernier enregistrement l’emporte.</p></div>
+    <textarea data-note="commune" style="min-height:340px" aria-label="Note commune"${U.preview ? ' disabled' : ''}>${esc(c.texte)}</textarea><p class="sm muted">Visible et modifiable par tout le groupe et le meneur. Évitez d’écrire à plusieurs en même temps : le dernier enregistrement l’emporte.</p></div>
    ${isMJ() ? `<div class="box"><h2 style="margin-bottom:4px">Carnets des joueurs</h2><p>Chaque joueur dispose d’un carnet privé, visible de lui seul sur le site.</p></div>`
+            : U.preview ? `<div class="box"><h2 style="margin-bottom:4px">Mon carnet</h2><p class="sm muted">Ici, le joueur a son carnet privé. Son contenu ne t’est pas accessible, même en aperçu.</p><div class="empty">Carnet privé</div></div>`
             : `<div class="box"><h2 style="margin-bottom:4px">Mon carnet</h2><p class="sm muted">Privé : personne d’autre ne le voit sur le site.</p>
     <textarea data-note="perso" style="min-height:340px" aria-label="Note personnelle">${esc(D.notePerso)}</textarea></div>`}</div>`;
 }
@@ -273,6 +282,8 @@ function mj() {
   const free = (D.agents.find(a => !a.joueur) || {}).id;
   const agentOpts = D.groupes.map(gr => `<optgroup label="${esc(gr.nom)}">${D.agents.filter(a => a.groupe === gr.id).map(a => `<option value="${a.id}"${a.id === free ? ' selected' : ''}>${esc(a.data.name)}${a.joueur ? ' (' + esc(playerOf(a)) + ')' : ''}</option>`).join('')}</optgroup>`).join('');
   return `<div class="hd"><h1>Espace MJ</h1></div>
+  <div class="box tint" style="margin-bottom:22px"><h2 style="margin-bottom:6px">Voir comme un joueur</h2><p class="sm muted" style="margin-top:0">Affiche le site tel que le voit le joueur d’un agent : sans SAN, sans opérations verrouillées ni aides cachées.</p>
+   ${D.agents.length ? `<div class="row"><select id="pv-a" aria-label="Agent" style="flex:1 1 220px">${D.groupes.map(gr => `<optgroup label="${esc(gr.nom)}">${D.agents.filter(a => a.groupe === gr.id).map(a => `<option value="${a.id}"${a.groupe === G() ? '' : ''}>${esc(a.data.name)}${a.joueur ? ' (' + esc(playerOf(a)) + ')' : ''}</option>`).join('')}</optgroup>`).join('')}</select><button class="primary small" data-act="preview-on">Voir comme ce joueur</button></div>` : '<p class="muted">Aucun agent.</p>'}</div>
   <div class="box"><h2 style="margin-bottom:10px">Accréditations</h2>
    ${pend.length ? pend.map(p => `<div style="margin-bottom:14px"><p style="margin:0 0 6px"><b>${esc(p.discord)}</b> <span class="sm muted">connecté le ${fmtD(p.cree_le)}</span></p>
      ${D.agents.length ? `<div class="row"><select data-pend="${p.id}" aria-label="Rattacher à l’agent" style="flex:1 1 220px">${agentOpts}</select><button class="small primary" data-act="accr" data-id="${p.id}">Accréditer</button><button class="small danger" data-act="refuse" data-id="${p.id}" data-confirm>Refuser</button></div>` : '<p class="sm muted">Crée d’abord les agents pour pouvoir le rattacher.</p>'}</div>`).join('') : '<p class="muted">Aucune demande en attente.</p>'}
@@ -343,6 +354,8 @@ document.addEventListener('click', async e => {
     case 'login': try { const r = await api.login(); if (r && r.error) throw r.error; } catch (err) { fail(err); } return;
     case 'logout': await api.logout().catch(() => {}); U.uid = null; U.profil = null; U.state = 'login'; render(); return;
     case 'refresh': U.state = 'loading'; render(); try { await reload(); } catch (err) { U.state = 'error'; U.err = err.message; } route(); return;
+    case 'preview-on': { const a = agentById(document.getElementById('pv-a').value); if (!a) return; U.savedGroup = U.group; U.preview = a.id; U.group = a.groupe; U.agent = a.id; U.op = null; U.filter = 'all'; location.hash = 'tableau'; route(); window.scrollTo(0, 0); return; }
+    case 'preview-off': U.preview = null; U.group = U.savedGroup || U.group; U.agent = null; U.op = null; U.filter = 'all'; location.hash = 'mj'; route(); return;
     case 'agent': U.agent = id; break;
     case 'op': U.op = id; break;
     case 'openop': U.op = id; location.hash = 'operations'; return;
@@ -388,6 +401,7 @@ document.addEventListener('click', async e => {
 });
 
 document.addEventListener('input', e => {
+  if (U.preview) return;
   const t = e.target, ds = t.dataset;
   if (ds.a && ds.f) {
     const a = agentById(ds.a); if (!a || !canEdit(a)) return;
@@ -414,6 +428,7 @@ document.addEventListener('input', e => {
 });
 
 document.addEventListener('change', async e => {
+  if (U.preview) return;
   const t = e.target;
   if (t.dataset.portrait) {
     const a = agentById(t.dataset.portrait); if (!a || !canEdit(a) || !t.files[0]) return;
