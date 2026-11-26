@@ -367,11 +367,24 @@ function card(h) {
   return `<button class="card${h.visible ? '' : ' lock'}" data-act="lb" data-id="${h.id}" style="--r:${r}deg"><div class="ph">${img}</div><div class="cap"><b>${esc(h.titre)}</b><br><span class="muted">${esc(op ? op.titre : 'Hors opération')}${h.visible ? '' : ' · cachée aux joueurs'}</span></div></button>`;
 }
 function aidesView() {
-  const all = groupAides().filter(h => isMJ() || h.visible), opsWith = [...new Set(all.map(h => h.operation || ''))];
-  const list = all.filter(h => U.filter === 'all' || (h.operation || '') === U.filter);
-  return `<div class="hd"><h1>Pièces à conviction</h1><span class="muted sm">${all.length} pièce${all.length > 1 ? 's' : ''}${isMJ() ? ' · ajout depuis l’Espace MJ' : ''}</span></div>
-  ${opsWith.length > 1 ? `<div class="row" style="margin-bottom:22px"><button class="small${U.filter === 'all' ? ' primary' : ''}" data-act="filter" data-id="all">Toutes</button>${opsWith.map(id => `<button class="small${U.filter === id ? ' primary' : ''}" data-act="filter" data-id="${esc(id)}">${esc(id ? (opById(id) || {}).titre : 'Hors opération')}</button>`).join('')}</div>` : ''}
-  ${list.length ? `<div class="board"><div class="ev">${list.map(card).join('')}</div></div>` : '<div class="empty">Aucune aide de jeu pour l’instant.</div>'}`;
+  const all = groupAides().filter(h => isMJ() || h.visible);
+  const keys = [...groupOps().map(o => o.id).filter(id => all.some(h => h.operation === id)), ...(all.some(h => !h.operation || !opById(h.operation)) ? [''] : [])];
+  const inFolder = k => all.filter(h => k ? h.operation === k : (!h.operation || !opById(h.operation)));
+  const name = k => k ? (opById(k) || {}).titre : 'Hors opération';
+  if (U.filter !== 'all' && !keys.includes(U.filter)) U.filter = 'all';
+  if (U.filter === 'all') {
+    return `<div class="hd"><h1>Pièces à conviction</h1><span class="muted sm">${all.length} pièce${all.length > 1 ? 's' : ''} · ${keys.length} dossier${keys.length > 1 ? 's' : ''}${isMJ() ? ' · ajout depuis l’Espace MJ' : ''}</span></div>
+    ${keys.length ? `<div class="folders">${keys.map(k => { const items = inFolder(k), o = opById(k), shown = items.filter(h => h.url).slice(0, 3), hidden = items.filter(h => !h.visible).length;
+      return `<button class="folder" data-act="filter" data-id="${esc(k)}"><span class="ftab">${o && o.periode ? esc(o.periode.split('·')[0].trim()) : 'Dossier'}</span>
+        <span class="fbody"><span class="peek">${shown.map((h, n) => `<img src="${esc(h.url)}" alt="" style="--n:${n}">`).join('')}</span>
+        <span class="fname">${esc(name(k))}</span><span class="fcount">${items.length} pièce${items.length > 1 ? 's' : ''}${isMJ() && hidden ? ` · ${hidden} cachée${hidden > 1 ? 's' : ''}` : ''}</span>
+        ${o ? `<span class="fstamp">${o.statut === 'terminee' ? 'Classé' : o.statut === 'en_cours' ? 'En cours' : 'Verrouillé'}</span>` : ''}</span></button>`; }).join('')}</div>`
+      : '<div class="empty">Aucune aide de jeu pour l’instant.</div>'}`;
+  }
+  const list = inFolder(U.filter);
+  return `<nav class="crumbs" aria-label="Fil d’Ariane"><button class="small" data-act="filter" data-id="all">← Tous les dossiers</button><span class="muted">Pièces à conviction ›</span></nav>
+   <div class="hd"><h1>${esc(name(U.filter))}</h1><span class="muted sm">${list.length} pièce${list.length > 1 ? 's' : ''}</span></div>
+   ${list.length ? `<div class="board"><div class="ev">${list.map(card).join('')}</div></div>` : '<div class="empty">Ce dossier est vide.</div>'}`;
 }
 function lightbox() {
   if (U.lbIll) {
@@ -390,7 +403,7 @@ function lightbox() {
      <div class="img"><img class="badge-big" src="${esc(b)}" alt="Badge de ${esc(a.data.name)}"></div><div class="bar"></div></div>`;
   }
   if (!U.lb) return '';
-  const list = groupAides().filter(h => isMJ() || h.visible);
+  const list = groupAides().filter(h => (isMJ() || h.visible) && (U.view !== 'aides' || U.filter === 'all' || (U.filter ? h.operation === U.filter : (!h.operation || !opById(h.operation)))));
   const i = list.findIndex(h => h.id === U.lb); if (i < 0) return '';
   const h = list[i], n = list.length;
   return `<div class="lb" role="dialog" aria-modal="true" aria-label="${esc(h.titre)}"><div class="bar"><span class="typed" style="font-size:19px">${esc(h.titre)}</span><span class="row">${h.url ? `<a class="btn small" style="border-color:#8f9b84;color:#ecebdf" href="${esc(h.url)}" target="_blank" rel="noopener">Ouvrir en grand</a>` : ''}<button data-act="lbclose">Fermer</button></span></div>
