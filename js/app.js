@@ -5,7 +5,7 @@ const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const api = window.API_OVERRIDE || window.createApi(window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseKey));
 
 /* ------------------------------------------------------------ état */
-const D = { badges: {}, groupes: [], agents: [], secrets: {}, ops: [], seances: [], aides: [], notesC: {}, notePerso: '', profils: [] };
+const D = { illus: [], badges: {}, groupes: [], agents: [], secrets: {}, ops: [], seances: [], aides: [], notesC: {}, notePerso: '', profils: [] };
 const U = { uid: null, profil: null, discord: '', state: 'loading', err: '', group: null, view: 'tableau', op: null, agent: null, lb: null, filter: 'all', lastLoad: 0, preview: null, savedGroup: null };
 const VIEWS = [['tableau', 'Tableau'], ['agents', 'Agents'], ['operations', 'Opérations'], ['notes', 'Notes'], ['aides', 'Aides de jeu']];
 const STATS = ['FOR', 'CON', 'DEX', 'INT', 'POU', 'CHA'];
@@ -74,10 +74,19 @@ function dataUrlFile(url, name) {
   const bin = atob(b64), buf = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
   return new File([buf], name || 'piece.jpg', { type });
 }
+async function importIllus(op, seIds, list) {
+  let k = 0;
+  for (const i of list || []) {
+    const se = i.seance ? seIds[i.seance] || null : null; if (i.seance && !se) continue;
+    await api.creerIllustration({ operation: op, seance: se, legende: i.legende || '', ordre: Number.isFinite(i.ordre) ? i.ordre : k++ }, okImg(i.image) ? dataUrlFile(i.image, i.fichier) : null);
+  }
+}
 async function importOperation(x) {
   const op = x.operation, groupe = x.groupe && D.groupes.some(g => g.id === x.groupe) ? x.groupe : G();
   const o = await api.creerOp({ groupe, titre: op.titre || 'Opération', statut: op.statut || 'verrouillee', periode: op.periode || '', resume: op.resume || '', ordre: Number.isFinite(op.ordre) ? op.ordre : groupOps().length });
   for (const s of x.seances || []) await api.creerSeance({ operation: o.id, numero: s.numero || 1, date: s.date || null, compte_rendu: s.compte_rendu || '' });
+  const seIds = {}; (await api.seances()).filter(s => s.operation === o.id).forEach(s => { seIds[s.numero] = s.id; });
+  await importIllus(o.id, seIds, x.illustrations);
   for (const h of x.aides || []) await api.creerAide({ groupe, operation: o.id, titre: h.titre || 'Pièce', visible: !!h.visible }, okImg(h.image) ? dataUrlFile(h.image, h.fichier) : null);
   return o;
 }
@@ -105,7 +114,8 @@ async function reload() {
   U.profil = await api.profil(U.uid);
   if (!U.profil || U.profil.role === 'attente') { U.state = 'pending'; return; }
   if (U.profil.role === 'refuse') { U.state = 'refuse'; return; }
-  const [g, a, o, s, h, n, p] = await Promise.all([api.groupes(), api.agents(), api.operations(), api.seances(), api.aides(), api.notesCommunes(), api.profils()]);
+  const [g, a, o, s, h, n, p, il] = await Promise.all([api.groupes(), api.agents(), api.operations(), api.seances(), api.aides(), api.notesCommunes(), api.profils(), api.illustrations ? api.illustrations().catch(() => []) : []]);
+  D.illus = il;
   D.groupes = g; D.ops = o; D.seances = s; D.aides = h; D.profils = p;
   D.agents = a.map(x => ({ ...x, data: norm(x.data) })).sort((x, y) => x.data.name.localeCompare(y.data.name));
   D.notesC = Object.fromEntries(n.map(x => [x.groupe, x]));
@@ -294,6 +304,16 @@ function agents() {
 }
 
 /* ------------------------------------------------------------ opérations */
+const illusOf = (op, se) => D.illus.filter(i => i.operation === op && (se === null ? !i.seance : i.seance === se)).sort((a, b) => a.ordre - b.ordre);
+function pinFig(i, n) {
+  const r = (((i.id.charCodeAt(0) + n * 7) % 5) - 2) * .9;
+  return `<figure class="pin" style="--r:${r}deg"><button class="pinimg" data-act="ill" data-id="${i.id}" aria-label="Agrandir ${esc(i.legende || 'l’image')}">${i.url ? `<img src="${esc(i.url)}" alt="${esc(i.legende)}" loading="lazy">` : '<span class="noimg">Pas d’image</span>'}</button>${i.legende ? `<figcaption>${esc(i.legende)}</figcaption>` : ''}</figure>`;
+}
+function edFig(i) {
+  return `<figure class="pin ed"><button class="pinimg" data-act="ill" data-id="${i.id}" aria-label="Agrandir">${i.url ? `<img src="${esc(i.url)}" alt="">` : '<span class="noimg">Pas d’image</span>'}</button>
+    <input data-ill="${i.id}" value="${esc(i.legende)}" placeholder="Légende" aria-label="Légende"><button class="small danger" data-act="delill" data-id="${i.id}" data-confirm>Retirer</button></figure>`;
+}
+const addIll = (op, se, label) => `<label class="btn small addill">${label}<input class="vis" type="file" accept="image/*" multiple data-illop="${op}" data-illse="${se || ''}"></label>`;
 function operations() {
   const list = groupOps(), mj = isMJ();
   if (!U.op || !list.some(o => o.id === U.op)) U.op = (list.find(o => o.statut === 'en_cours') || list[0] || {}).id;
@@ -303,21 +323,25 @@ function operations() {
   if (!o) return `<div class="grid side">${side}<article><div class="empty">${mj ? 'Crée ta première opération avec « + Nouvelle ».' : 'Aucune opération pour l’instant.'}</div></article></div>`;
   const ss = seancesOf(o.id), pieces = groupAides().filter(h => h.operation === o.id && (mj || h.visible));
   const piecesHtml = panel('photo', 'Pièces liées', pieces.length ? `<div class="board"><div class="ev">${pieces.map(card).join('')}</div></div>` : '<p class="muted">Aucune pièce pour cette opération.</p>');
-  const head = `<div class="dosno">Opération${o.periode ? ' · ' + esc(o.periode) : ''}</div><div class="hd"><h1>${esc(o.titre)}</h1>${statusStamp(o.statut)}</div>`;
+  const cov = illusOf(o.id, null)[0];
+  const head = `<div class="dosno">Opération${o.periode ? ' · ' + esc(o.periode) : ''}</div><div class="hd"><h1>${esc(o.titre)}</h1>${statusStamp(o.statut)}</div>
+    ${cov && cov.url ? `<figure class="cover"><button class="pinimg" data-act="ill" data-id="${cov.id}" aria-label="Agrandir la couverture"><img src="${esc(cov.url)}" alt="${esc(cov.legende)}"></button>${cov.legende ? `<figcaption>${esc(cov.legende)}</figcaption>` : ''}</figure>` : ''}`;
   if (!mj) return `<div class="grid side">${side}<article class="opdoc">${head}
     ${o.resume ? panel('bio', 'Synthèse de l’opération', `<div class="ro-text plain">${esc(o.resume)}</div>`, 'brass') : ''}
     <h2 class="subh">Rapports de séance</h2>
-    ${ss.length ? ss.map(s => `<article class="report"><div class="rh"><span>Rapport de séance n°${s.numero}</span><span>${fmtD(s.date)}</span></div><div class="rb">${esc(s.compte_rendu)}</div></article>`).join('') : '<p class="muted">Aucun rapport pour l’instant.</p>'}
+    ${ss.length ? ss.map(s => { const pics = illusOf(o.id, s.id); return `<article class="report"><div class="rh"><span>Rapport de séance n°${s.numero}</span><span>${fmtD(s.date)}</span></div><div class="rbody">${pics.length ? `<div class="pics">${pics.map(pinFig).join('')}</div>` : ''}<div class="rb">${esc(s.compte_rendu)}</div></div></article>`; }).join('') : '<p class="muted">Aucun rapport pour l’instant.</p>'}
     ${piecesHtml}</article></div>`;
   return `<div class="grid side">${side}<article class="opdoc">${head}
     ${panel('bio', 'Fiche de l’opération', `<div class="mjbar"><div style="flex:3 1 260px"><label for="op-t">Titre</label><input id="op-t" class="edit-title" data-op="${o.id}" data-of="titre" value="${esc(o.titre)}"></div>
      <div><label for="op-s">Statut</label><select id="op-s" data-opst="${o.id}">${[['verrouillee', 'Verrouillée (invisible)'], ['en_cours', 'En cours'], ['terminee', 'Classée']].map(([k, l]) => `<option value="${k}"${o.statut === k ? ' selected' : ''}>${l}</option>`).join('')}</select></div></div>
      <div class="mjbar"><div><label for="op-p">Période</label><input id="op-p" data-op="${o.id}" data-of="periode" value="${esc(o.periode)}" placeholder="ex. Depuis novembre 2026"></div>
       <div style="flex:0 0 auto"><button class="small danger" data-act="delop" data-id="${o.id}" data-confirm>Supprimer l’opération</button></div></div>
+     <div class="covered"><span class="sm muted">Couverture</span>${cov ? edFig(cov) : addIll(o.id, null, '+ Image de couverture')}</div>
      <label for="op-r">Synthèse (à remplir quand l’opération est classée)</label><textarea class="ruled" id="op-r" data-op="${o.id}" data-of="resume">${esc(o.resume)}</textarea>`, 'brass')}
     <div class="hd" style="margin-top:26px"><h2 class="subh" style="margin:0">Rapports de séance</h2><button class="primary" data-act="addseance" data-id="${o.id}">+ Nouveau rapport</button></div>
     ${ss.length ? ss.map(s => `<article class="report"><div class="rh ed"><span class="row">Rapport n°<input type="number" data-se="${s.id}" data-sf="numero" value="${s.numero}" aria-label="Numéro"></span>
       <span class="row"><input type="date" data-se="${s.id}" data-sf="date" value="${esc(s.date || '')}" aria-label="Date"><button class="small danger" data-act="delseance" data-id="${s.id}" data-confirm>Supprimer</button></span></div>
+      <div class="pics ed">${illusOf(o.id, s.id).map(edFig).join('')}${addIll(o.id, s.id, '+ Image')}</div>
       <textarea class="ruled rb" data-se="${s.id}" data-sf="compte_rendu" aria-label="Compte rendu" placeholder="Ce qui s’est passé pendant la séance…">${esc(s.compte_rendu)}</textarea></article>`).join('') : '<p class="muted">Aucun rapport.</p>'}
     ${piecesHtml}</article></div>`;
 }
@@ -350,6 +374,15 @@ function aidesView() {
   ${list.length ? `<div class="board"><div class="ev">${list.map(card).join('')}</div></div>` : '<div class="empty">Aucune aide de jeu pour l’instant.</div>'}`;
 }
 function lightbox() {
+  if (U.lbIll) {
+    const cur = D.illus.find(i => i.id === U.lbIll); if (!cur) return '';
+    const ss = seancesOf(cur.operation).map(s => s.id);
+    const list = D.illus.filter(i => i.operation === cur.operation && i.url).sort((a, b) => (a.seance ? ss.indexOf(a.seance) + 1 : 0) - (b.seance ? ss.indexOf(b.seance) + 1 : 0) || a.ordre - b.ordre);
+    const k = list.findIndex(i => i.id === cur.id), n = list.length;
+    return `<div class="lb" role="dialog" aria-modal="true" aria-label="${esc(cur.legende || 'Illustration')}"><div class="bar"><span class="typed" style="font-size:19px">${esc(cur.legende || '')}</span><button data-act="lbclose">Fermer</button></div>
+     <div class="img">${cur.url ? `<img src="${esc(cur.url)}" alt="${esc(cur.legende)}">` : ''}</div>
+     <div class="bar">${n > 1 && k >= 0 ? `<button data-act="ill" data-id="${list[(k - 1 + n) % n].id}">← Précédente</button><span class="sm">${k + 1} / ${n}</span><button data-act="ill" data-id="${list[(k + 1) % n].id}">Suivante →</button>` : ''}</div></div>`;
+  }
   if (U.lbBadge) {
     const a = agentById(U.lbBadge), b = D.badges[U.lbBadge];
     if (!a || !okImg(b)) return '';
@@ -415,7 +448,7 @@ function render() {
 function route() {
   const h = location.hash.slice(1);
   const ok = VIEWS.some(v => v[0] === h) || (h === 'mj' && isMJ());
-  U.view = ok ? h : 'tableau'; U.lb = null; U.lbBadge = null; render();
+  U.view = ok ? h : 'tableau'; U.lb = null; U.lbBadge = null; U.lbIll = null; render();
 }
 window.addEventListener('hashchange', route);
 
@@ -444,7 +477,9 @@ document.addEventListener('click', async e => {
     case 'openop': U.op = id; location.hash = 'operations'; return;
     case 'filter': U.filter = id; break;
     case 'lb': U.lb = id; break;
-    case 'lbclose': U.lb = null; U.lbBadge = null; break;
+    case 'lbclose': U.lb = null; U.lbBadge = null; U.lbIll = null; break;
+    case 'ill': U.lbIll = id; break;
+    case 'delill': { const il = D.illus.find(x => x.id === id); await run(async () => { await api.supprIllustration(il); await reload(); }, 'Image retirée'); break; }
     case 'badge': U.lbBadge = id; break;
     case 'delbadge': await run(async () => { await api.delBadge(id); D.badges[id] = null; }, 'Badge retiré'); break;
     case 'add': { const a = agentById(U.agent), k = t.dataset.k; a.data[k].push(k === 'liens' ? { n: '', s: 0 } : k === 'comps' ? { n: '', v: 0 } : { n: '', c: '', d: '', p: '' }); saveAgent(a); break; }
@@ -471,6 +506,15 @@ document.addEventListener('click', async e => {
     case 'delaide': { const h = D.aides.find(x => x.id === id); await run(async () => { await api.supprAide(h); await reload(); }, 'Pièce supprimée'); break; }
     case 'import': {
       let liste; try { liste = JSON.parse(document.getElementById('imp').value); } catch (err) { toast('Données illisibles : ' + err.message, true); return; }
+      if (liste && !Array.isArray(liste) && liste.illustrations_pour) {
+        const nom = String(liste.illustrations_pour).trim().toLowerCase();
+        const o = D.ops.find(y => y.titre.trim().toLowerCase() === nom && (!liste.groupe || y.groupe === liste.groupe)) || D.ops.find(y => y.titre.trim().toLowerCase() === nom);
+        if (!o) { toast('Opération « ' + liste.illustrations_pour + ' » introuvable : importe d’abord son dossier.', true); return; }
+        const seIds = {}; seancesOf(o.id).forEach(s => { seIds[s.numero] = s.id; });
+        t.disabled = true; t.textContent = 'Import en cours…';
+        await run(async () => { await importIllus(o.id, seIds, liste.illustrations); await reload(); U.op = o.id; toast('Illustrations importées'); location.hash = 'operations'; });
+        return;
+      }
       if (liste && !Array.isArray(liste) && liste.operation) {
         const dossier = liste; t.disabled = true; t.textContent = 'Import en cours…';
         await run(async () => { const o = await importOperation(dossier); await reload(); U.op = o.id; toast('Opération importée'); location.hash = 'operations'; });
@@ -518,6 +562,8 @@ document.addEventListener('input', e => {
   } else if (ds.se && ds.sf) {
     const s = D.seances.find(x => x.id === ds.se); s[ds.sf] = ds.sf === 'numero' ? (+t.value || 1) : (t.value || (ds.sf === 'date' ? null : ''));
     later('se' + s.id + ds.sf, () => api.majSeance(s.id, { [ds.sf]: s[ds.sf] }));
+  } else if (ds.ill) {
+    const il = D.illus.find(x => x.id === ds.ill); il.legende = t.value; later('il' + il.id, () => api.majIllustration(il.id, { legende: il.legende }));
   } else if (ds.g) {
     const g = groupById(G()); g[ds.g] = t.value; later('g' + g.id + ds.g, () => api.majGroupe(g.id, { [ds.g]: g[ds.g] }));
   }
@@ -530,6 +576,11 @@ document.addEventListener('change', async e => {
     const a = agentById(t.dataset.portrait); if (!a || !canEdit(a) || !t.files[0]) return;
     await run(async () => { a.portrait = await imageFile(t.files[0], 360, 450, true); await api.majAgent(a.id, { portrait: a.portrait }); }, 'Photo enregistrée');
     render();
+  } else if (t.dataset.illop) {
+    const files = [...t.files]; if (!files.length) return;
+    const op = t.dataset.illop, se = t.dataset.illse || null;
+    await run(async () => { let n = illusOf(op, se).length; for (const f of files) await api.creerIllustration({ operation: op, seance: se, legende: '', ordre: n++ }, await imageFile(f, 1800, 1800, false)); await reload(); }, files.length > 1 ? 'Images ajoutées' : 'Image ajoutée');
+    render();
   } else if (t.dataset.badgefile) {
     const a = agentById(t.dataset.badgefile); if (!a || !canEdit(a) || !t.files[0]) return;
     await run(async () => { const img = await badgeImage(t.files[0]); await api.setBadge(a.id, img); D.badges[a.id] = img; }, 'Badge enregistré');
@@ -541,11 +592,11 @@ document.addEventListener('change', async e => {
 });
 
 document.addEventListener('keydown', e => {
-  if (!U.lb && !U.lbBadge) return;
-  if (e.key === 'Escape') { U.lb = null; U.lbBadge = null; render(); return; }
+  if (!U.lb && !U.lbBadge && !U.lbIll) return;
+  if (e.key === 'Escape') { U.lb = null; U.lbBadge = null; U.lbIll = null; render(); return; }
   if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-    const b = [...document.querySelectorAll('.lb [data-act="lb"]')]; const btn = e.key === 'ArrowRight' ? b[1] : b[0];
-    if (btn) { U.lb = btn.dataset.id; render(); }
+    const b = [...document.querySelectorAll('.lb [data-act="lb"], .lb [data-act="ill"]')]; const btn = e.key === 'ArrowRight' ? b[1] : b[0];
+    if (btn) { if (U.lbIll) U.lbIll = btn.dataset.id; else U.lb = btn.dataset.id; render(); }
   }
 });
 document.addEventListener('visibilitychange', () => {

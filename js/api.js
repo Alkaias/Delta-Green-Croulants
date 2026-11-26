@@ -66,6 +66,30 @@ window.createApi = function (sb) {
       ok(await sb.from('aides').delete().eq('id', a.id));
     },
 
+    async illustrations() {
+      const rows = ok(await sb.from('illustrations').select('*').order('ordre').order('cree_le'));
+      const paths = rows.filter(r => r.image).map(r => r.image), urls = {};
+      if (paths.length) {
+        const { data } = await sb.storage.from('illustrations').createSignedUrls(paths, 3600 * 6);
+        (data || []).forEach(d => { if (d.signedUrl) urls[d.path] = d.signedUrl; });
+      }
+      return rows.map(r => ({ ...r, url: urls[r.image] || null }));
+    },
+    async creerIllustration(f, file) {
+      const row = ok(await sb.from('illustrations').insert(f).select().single());
+      if (file) {
+        const path = `${row.id}/${Date.now()}-${safe(file.name || 'image.jpg')}`;
+        ok(await sb.storage.from('illustrations').upload(path, file, { contentType: file.type || 'image/jpeg' }));
+        ok(await sb.from('illustrations').update({ image: path }).eq('id', row.id));
+      }
+      return row;
+    },
+    async majIllustration(id, f) { ok(await sb.from('illustrations').update(f).eq('id', id)); },
+    async supprIllustration(il) {
+      if (il.image) await sb.storage.from('illustrations').remove([il.image]);
+      ok(await sb.from('illustrations').delete().eq('id', il.id));
+    },
+
     async notesCommunes() { return ok(await sb.from('notes_communes').select('*')); },
     async sauverNoteCommune(groupe, texte, par) {
       ok(await sb.from('notes_communes').upsert({ groupe, texte, modifie_par: par, modifie_le: now() }));
