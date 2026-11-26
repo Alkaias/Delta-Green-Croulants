@@ -69,6 +69,18 @@ function later(key, fn, ms = 700) {
 }
 async function run(fn, msg) { try { await fn(); if (msg) toast(msg); } catch (e) { fail(e); } }
 
+function dataUrlFile(url, name) {
+  const [head, b64] = url.split(','), type = (head.match(/data:([^;]+)/) || [])[1] || 'image/jpeg';
+  const bin = atob(b64), buf = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+  return new File([buf], name || 'piece.jpg', { type });
+}
+async function importOperation(x) {
+  const op = x.operation, groupe = x.groupe && D.groupes.some(g => g.id === x.groupe) ? x.groupe : G();
+  const o = await api.creerOp({ groupe, titre: op.titre || 'Opération', statut: op.statut || 'verrouillee', periode: op.periode || '', resume: op.resume || '', ordre: Number.isFinite(op.ordre) ? op.ordre : groupOps().length });
+  for (const s of x.seances || []) await api.creerSeance({ operation: o.id, numero: s.numero || 1, date: s.date || null, compte_rendu: s.compte_rendu || '' });
+  for (const h of x.aides || []) await api.creerAide({ groupe, operation: o.id, titre: h.titre || 'Pièce', visible: !!h.visible }, okImg(h.image) ? dataUrlFile(h.image, h.fichier) : null);
+  return o;
+}
 async function badgeImage(file) {
   const bmp = await createImageBitmap(file), r = Math.min(1, 1000 / bmp.height, 800 / bmp.width);
   const c = document.createElement('canvas'); c.width = Math.round(bmp.width * r); c.height = Math.round(bmp.height * r);
@@ -458,8 +470,13 @@ document.addEventListener('click', async e => {
     case 'toggleaide': { const h = D.aides.find(x => x.id === id); await run(async () => { await api.majAide(id, { visible: !h.visible }); await reload(); }); break; }
     case 'delaide': { const h = D.aides.find(x => x.id === id); await run(async () => { await api.supprAide(h); await reload(); }, 'Pièce supprimée'); break; }
     case 'import': {
-      let liste; try { liste = JSON.parse(document.getElementById('imp').value); if (!Array.isArray(liste)) throw new Error('Il faut une liste [ … ]'); }
-      catch (err) { toast('Données illisibles : ' + err.message, true); return; }
+      let liste; try { liste = JSON.parse(document.getElementById('imp').value); } catch (err) { toast('Données illisibles : ' + err.message, true); return; }
+      if (liste && !Array.isArray(liste) && liste.operation) {
+        const dossier = liste; t.disabled = true; t.textContent = 'Import en cours…';
+        await run(async () => { const o = await importOperation(dossier); await reload(); U.op = o.id; toast('Opération importée'); location.hash = 'operations'; });
+        return;
+      }
+      if (!Array.isArray(liste)) { toast('Données illisibles : fichier non reconnu', true); return; }
       liste = liste.map(x => ({ ...x, groupe: x.groupe || G(), data: norm(x.data) }));
       const badges = liste.filter(x => x.foundry_id && okImg(x.badge)).map(x => [x.foundry_id, x.badge]);
       liste = liste.map(({ badge, ...x }) => x);
