@@ -207,7 +207,7 @@ const EMBLEM = s => `<svg class="emblem" width="${s}" height="${s}" viewBox="0 0
  <circle cx="60" cy="64" r="3.2" fill="var(--embg,#3a4733)"/><path d="M58.6 66h2.8l1 6h-4.8z" fill="var(--embg,#3a4733)"/>
  <path d="M60 30l1.8 3.7 4 .6-2.9 2.8.7 4-3.6-1.9-3.6 1.9.7-4-2.9-2.8 4-.6z" fill="currentColor"/></svg>`;
 const icon = k => `<svg class="ico" viewBox="0 0 24 24" aria-hidden="true">${ICO[k]}</svg>`;
-const panel = (k, title, body, cls) => `<section class="panel ${cls || ''}"><h3 class="ph">${icon(k)}<span>${title}</span></h3><div class="pb">${body}</div></section>`;
+const panel = (k, title, body, cls) => `<section class="panel ${cls || ''}"><h3 class="phd">${icon(k)}<span>${title}</span></h3><div class="pb">${body}</div></section>`;
 function richMotiv(t) {
   let mode = 'm'; const m = [], tr = [];
   String(t || '').split('\n').map(l => l.trim()).filter(Boolean).forEach(l => {
