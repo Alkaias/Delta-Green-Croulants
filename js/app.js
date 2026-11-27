@@ -17,6 +17,7 @@ const G = () => U.group;
 const agentById = id => D.agents.find(a => a.id === id);
 const groupById = id => D.groupes.find(g => g.id === id) || { id, nom: '—', monde: '' };
 const opById = id => D.ops.find(o => o.id === id);
+const codeName = d => [d.cellule && 'Cellule ' + d.cellule, d.alias && 'Agent ' + d.alias].filter(Boolean).join(' – ');
 const myAgent = () => U.preview ? agentById(U.preview) : D.agents.find(a => a.joueur === U.uid);
 const playerOf = a => (D.profils.find(p => p.id === a.joueur) || {}).discord || '';
 const canEdit = a => !U.preview && (isMJ() || a.joueur === U.uid);
@@ -36,7 +37,7 @@ function norm(d) {
   STATS.forEach(k => { stats[k] = num(st[k], 10); });
   const pvMax = Math.ceil((stats.FOR + stats.CON) / 2);
   return {
-    name: str(d.name, 'Agent sans nom'), prof: str(d.prof), stats,
+    name: str(d.name, 'Agent sans nom'), prof: str(d.prof), cellule: str(d.cellule), alias: str(d.alias), stats,
     pv: { cur: num(d.pv && d.pv.cur, pvMax), max: num(d.pv && d.pv.max, pvMax) },
     vol: { cur: num(d.vol && d.vol.cur, stats.POU), max: num(d.vol && d.vol.max, stats.POU) },
     motiv: str(d.motiv), liens: arr(d.liens).map(l => ({ n: str(l.n), s: num(l.s, 0) })),
@@ -271,17 +272,19 @@ function agents() {
   const adapt = `<div class="adapt"><div class="checks"><span>Adapté à la violence</span>${d.violence.map((c, i) => `<input type="checkbox" data-a="${a.id}" data-f="violence.${i}"${c ? ' checked' : ''}${ed ? '' : ' disabled'} aria-label="Violence ${i + 1}">`).join('')}</div>
      <div class="checks"><span>Adapté à l’impuissance</span>${d.impuiss.map((c, i) => `<input type="checkbox" data-a="${a.id}" data-f="impuiss.${i}"${c ? ' checked' : ''}${ed ? '' : ' disabled'} aria-label="Impuissance ${i + 1}">`).join('')}</div></div>`;
   return `<div class="grid side">
-  <div><h2 style="margin-bottom:10px">Agents</h2><ul class="list">${list.map(y => `<li><button class="pick" data-act="agent" data-id="${y.id}"${y.id === a.id ? ' aria-current="true"' : ''}>${portrait(y, 'pt')}<span><b>${esc(y.data.name)}</b><span class="sm muted">${esc(playerOf(y) || 'pas de joueur')}${y.joueur === U.uid ? ' · vous' : ''}</span></span></button></li>`).join('')}</ul></div>
+  <div><h2 style="margin-bottom:10px">Agents</h2><ul class="list">${list.map(y => `<li><button class="pick" data-act="agent" data-id="${y.id}"${y.id === a.id ? ' aria-current="true"' : ''}>${portrait(y, 'pt')}<span><b>${esc(y.data.name)}</b><span class="sm muted">${y.data.alias ? 'Agent ' + esc(y.data.alias) + ' · ' : ''}${esc(playerOf(y) || 'pas de joueur')}${y.joueur === U.uid ? ' · vous' : ''}</span></span></button></li>`).join('')}</ul></div>
   <article class="dossier">
    <div class="idcard"><div><div class="portrait">${portrait(a)}</div>
      ${ed ? `<div class="pbtns"><label class="btn small" for="pf-${a.id}">${a.portrait ? 'Changer la photo' : 'Ajouter une photo'}</label><input class="vis" type="file" accept="image/*" id="pf-${a.id}" data-portrait="${a.id}">${a.portrait ? `<button class="small" data-act="delportrait" data-id="${a.id}">Retirer</button>` : ''}</div>` : ''}
      ${badgeBlock(a, ed)}</div>
     <div><div class="dosno">Dossier n° ${esc(dossier)}</div>
      <div class="hd" style="margin-bottom:6px"><h1>${esc(d.name)}</h1>${stamp}</div>
+     ${codeName(d) ? `<p class="codename">${esc(codeName(d))}</p>` : ''}
      <p class="prof">${esc(d.prof) || '<span class="muted">Profession non renseignée</span>'}${playerOf(a) ? `<span class="muted"> · joué par ${esc(playerOf(a))}</span>` : ''}</p>
      <div class="vitals">${meter('Points de vie', d.pv.cur, d.pv.max)}${meter('Volonté', d.vol.cur, d.vol.max)}
       ${isMJ() && s ? meter('Santé mentale', s.san, s.san_max) : '<div class="vital"><div class="vl"><span>Santé mentale</span></div><span class="redact">CLASSIFIÉ</span></div>'}</div>
-     ${ed ? `<details class="idedit"><summary>Modifier le nom et la profession</summary><div class="grid g2"><div><label>Nom de l’agent</label>${inp(a, 'name', d.name)}</div><div><label>Profession</label>${inp(a, 'prof', d.prof)}</div></div></details>` : ''}</div></div>
+     ${ed ? `<details class="idedit"><summary>Modifier l’identité</summary><div class="grid g2"><div><label>Nom de l’agent</label>${inp(a, 'name', d.name)}</div><div><label>Profession</label>${inp(a, 'prof', d.prof)}</div>
+      <div><label>Cellule (lettre)</label>${inp(a, 'cellule', d.cellule, '', ' placeholder="ex. K" maxlength="12"')}</div><div><label>Nom de code</label>${inp(a, 'alias', d.alias, '', ' placeholder="ex. Kate"')}</div></div></details>` : ''}</div></div>
    <div class="sheetgrid">
     ${panel('stats', 'Caractéristiques', `<div class="stats">${STATS.map(k => `<div class="stat"><label>${k}</label>${inp(a, 'stats.' + k, d.stats[k], 'n', ` aria-label="${k}"`)}<div class="x5" id="x5-${k}">×5 = ${d.stats[k] * 5}</div></div>`).join('')}</div>`, 'wide')}
     ${panel('pulse', 'Attributs dérivés', `<div class="derived">

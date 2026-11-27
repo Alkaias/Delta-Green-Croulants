@@ -421,3 +421,4 @@ input.score{-webkit-text-fill-color:var(--mint)}
 .dh{font:22px "Special Elite",monospace;margin:1.6em 0 .6em;color:var(--mint);border-bottom:1px solid var(--line);padding-bottom:6px}
 .conseq{border:1.5px solid var(--brass);background:rgba(140,122,69,.14);padding:10px 14px;border-radius:4px;margin:1.2em 0;font:16px "Courier Prime",monospace}
 .conseq::before{content:"Conséquence · ";color:#d9c38a;font-weight:700}
+.codename{margin:0 0 6px;font:19px "Special Elite",monospace;color:var(--stamp);letter-spacing:.02em}
