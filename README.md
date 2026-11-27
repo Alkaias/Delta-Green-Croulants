@@ -21,3 +21,5 @@ Site : https://alkaias.github.io/Delta-Green-Croulants/
 - SAN et seuil de rupture : table séparée, lisible par le MJ uniquement.
 - Opérations verrouillées et aides cachées : invisibles pour les joueurs.
 - Note de groupe partagée ; carnet personnel visible du seul joueur.
+
+Voir [MAINTENANCE.md](MAINTENANCE.md) pour reprendre le site (architecture, base, formats d'import, routine).
