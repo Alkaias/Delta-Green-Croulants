@@ -5,7 +5,7 @@ const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const api = window.API_OVERRIDE || window.createApi(window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseKey));
 
 /* ------------------------------------------------------------ état */
-const D = { illus: [], badges: {}, groupes: [], agents: [], secrets: {}, ops: [], seances: [], aides: [], notesC: {}, notePerso: '', profils: [] };
+const D = { dossiers: [], illus: [], badges: {}, groupes: [], agents: [], secrets: {}, ops: [], seances: [], aides: [], notesC: {}, notePerso: '', profils: [] };
 const U = { uid: null, profil: null, discord: '', state: 'loading', err: '', group: null, view: 'tableau', op: null, agent: null, lb: null, filter: 'all', lastLoad: 0, preview: null, savedGroup: null };
 const VIEWS = [['tableau', 'Tableau'], ['agents', 'Agents'], ['operations', 'Opérations'], ['notes', 'Notes'], ['aides', 'Aides de jeu']];
 const STATS = ['FOR', 'CON', 'DEX', 'INT', 'POU', 'CHA'];
@@ -116,6 +116,7 @@ async function reload() {
   if (U.profil.role === 'refuse') { U.state = 'refuse'; return; }
   const [g, a, o, s, h, n, p, il] = await Promise.all([api.groupes(), api.agents(), api.operations(), api.seances(), api.aides(), api.notesCommunes(), api.profils(), api.illustrations ? api.illustrations().catch(() => []) : []]);
   D.illus = il;
+  D.dossiers = api.dossiersPerso ? await api.dossiersPerso().catch(() => []) : [];
   D.groupes = g; D.ops = o; D.seances = s; D.aides = h; D.profils = p;
   D.agents = a.map(x => ({ ...x, data: norm(x.data) })).sort((x, y) => x.data.name.localeCompare(y.data.name));
   D.notesC = Object.fromEntries(n.map(x => [x.groupe, x]));
@@ -347,7 +348,44 @@ function operations() {
 }
 
 /* ------------------------------------------------------------ notes */
+function richText(t) {
+  const out = []; let para = [];
+  const flush = () => { if (para.length) { out.push(`<p>${para.map(esc).join('<br>')}</p>`); para = []; } };
+  String(t || '').split('\n').forEach(l => {
+    const x = l.trim();
+    if (!x) { flush(); return; }
+    if (x.startsWith('## ')) { flush(); out.push(`<h3 class="dh">${esc(x.slice(3))}</h3>`); return; }
+    if (x.startsWith('!! ')) { flush(); out.push(`<div class="conseq">${esc(x.slice(3))}</div>`); return; }
+    para.push(x);
+  });
+  flush(); return out.join('');
+}
+const dossiersOf = agentId => D.dossiers.filter(d => d.agent === agentId && (isMJ() || d.visible)).sort((a, b) => a.ordre - b.ordre);
+function dfolder(d) {
+  const pk = d.images.filter(i => i.url).slice(0, 2);
+  return `<button class="folder sm" data-act="dossier" data-id="${d.id}"><span class="ftab">${esc(d.sous_titre || 'Dossier')}</span>
+    <span class="fbody"><span class="peek">${pk.map((im, n) => `<img src="${esc(im.url)}" alt="" style="--n:${n}">`).join('')}</span><span class="fname">${esc(d.titre)}</span>
+    ${isMJ() ? `<span class="fstamp">${d.visible ? 'Visible' : 'Masqué'}</span>` : ''}</span></button>`;
+}
+function dossierView(d) {
+  const a = agentById(d.agent), mj = isMJ();
+  const crumbs = `<nav class="crumbs"><button class="small" data-act="dossier" data-id="">← Retour aux notes</button><span class="muted">Dossier personnel · ${esc(a ? a.data.name : '')}</span></nav>`;
+  if (!mj) return `${crumbs}<article class="dossier-perso"><div class="dosno">${esc(d.sous_titre)}</div><h1>${esc(d.titre)}</h1>
+    ${d.images.length ? `<div class="pics">${d.images.map((im, n) => im.url ? `<figure class="pin" style="--r:${(n % 2 ? 1.5 : -1.2)}deg"><button class="pinimg" data-act="dimg" data-id="${n}">${`<img src="${esc(im.url)}" alt="${esc(im.legende)}">`}</button>${im.legende ? `<figcaption>${esc(im.legende)}</figcaption>` : ''}</figure>` : '').join('')}</div>` : ''}
+    <div class="dtext">${richText(d.texte)}</div></article>`;
+  return `${crumbs}<article class="dossier-perso">
+    ${panel('bio', 'Dossier de ' + esc(a ? a.data.name : '?'), `<div class="mjbar"><div style="flex:3 1 240px"><label for="d-t">Titre</label><input id="d-t" class="edit-title" data-dos="${d.id}" data-df="titre" value="${esc(d.titre)}"></div>
+      <div><label for="d-s">Sous-titre (onglet de la chemise)</label><input id="d-s" data-dos="${d.id}" data-df="sous_titre" value="${esc(d.sous_titre)}"></div></div>
+      <div class="row" style="margin-bottom:14px"><button class="small${d.visible ? '' : ' primary'}" data-act="dvis" data-id="${d.id}">${d.visible ? 'Masquer au joueur' : 'Montrer au joueur'}</button><button class="small danger" data-act="ddel" data-id="${d.id}" data-confirm>Supprimer le dossier</button>
+       <span class="sm muted">${d.visible ? 'Visible par ' + esc(playerOf(a) || 'le joueur') : 'Masqué : le joueur ne le voit pas encore'}</span></div>
+      <div class="pics ed">${d.images.map((im, n) => `<figure class="pin ed"><button class="pinimg" data-act="dimg" data-id="${n}">${im.url ? `<img src="${esc(im.url)}" alt="">` : '<span class="noimg">Pas d’image</span>'}</button><input data-dimg="${n}" value="${esc(im.legende)}" placeholder="Légende" aria-label="Légende"><button class="small danger" data-act="dimgdel" data-id="${n}" data-confirm>Retirer</button></figure>`).join('')}
+       <label class="btn small addill">+ Image<input class="vis" type="file" accept="image/*" multiple data-dosimg="${d.id}"></label></div>
+      <label for="d-x">Texte · « ## » en début de ligne pour un intertitre, « !! » pour un encadré de conséquences</label>
+      <textarea id="d-x" class="ruled tall" data-dos="${d.id}" data-df="texte">${esc(d.texte)}</textarea>`, 'brass')}
+    <h2 class="subh">Aperçu</h2><div class="dtext">${richText(d.texte)}</div></article>`;
+}
 function notes() {
+  if (U.dossier) { const d = D.dossiers.find(x => x.id === U.dossier); if (d && (isMJ() || d.visible)) return dossierView(d); U.dossier = null; }
   const c = D.notesC[G()] || { texte: '', modifie_par: '', modifie_le: null };
   const commune = `<p class="sm muted" id="cby" style="margin-top:0">${c.modifie_par ? `Dernière modification : ${esc(c.modifie_par)}, ${esc(fmtDT(c.modifie_le))}` : 'Vide pour l’instant.'}</p>
     <textarea class="ruled tall" data-note="commune" aria-label="Note commune" placeholder="Pistes, noms, lieux, questions en suspens…"${U.preview ? ' disabled' : ''}>${esc(c.texte)}</textarea>
@@ -355,9 +393,18 @@ function notes() {
   const perso = isMJ() ? '<p>Chaque joueur dispose d’un carnet privé, visible de lui seul sur le site.</p>'
     : U.preview ? '<p class="sm muted" style="margin-top:0">Ici, le joueur a son carnet privé. Son contenu ne t’est pas accessible, même en aperçu.</p><div class="empty">Carnet privé</div>'
     : `<p class="sm muted" style="margin-top:0">Privé : personne d’autre ne le voit sur le site.</p><textarea class="ruled tall" data-note="perso" aria-label="Note personnelle" placeholder="Vos soupçons, vos secrets…">${esc(D.notePerso)}</textarea>`;
+  let dos;
+  if (isMJ()) {
+    dos = groupAgents().map(a => { const l = dossiersOf(a.id); return `<div class="dagent"><div class="hd" style="margin-bottom:10px"><span class="row">${portrait(a, 'pt')}<b>${esc(a.data.name)}</b><span class="sm muted">${esc(playerOf(a) || 'pas de joueur')}</span></span><button class="small" data-act="newdossier" data-id="${a.id}">+ Nouveau dossier</button></div>
+      ${l.length ? `<div class="folders">${l.map(dfolder).join('')}</div>` : '<p class="muted sm">Aucun dossier.</p>'}</div>`; }).join('') || '<p class="muted">Aucun agent dans ce groupe.</p>';
+  } else {
+    const me = myAgent(), l = me ? dossiersOf(me.id) : [];
+    dos = l.length ? `<div class="folders">${l.map(dfolder).join('')}</div>` : '<div class="empty">Rien pour l’instant. Le meneur y déposera les épisodes de la vie de votre agent entre les opérations.</div>';
+  }
   return `<div class="hd"><h1>Notes</h1></div><div class="sheetgrid">
    ${panel('team', 'Note de la cellule', commune)}
-   ${panel('key', isMJ() ? 'Carnets des joueurs' : 'Mon carnet', perso, 'brass')}</div>`;
+   ${panel('key', isMJ() ? 'Carnets des joueurs' : 'Mon carnet', perso, 'brass')}
+   ${panel('bio', isMJ() ? 'Dossiers personnels des agents' : 'Mon dossier personnel', (isMJ() ? '<p class="sm muted" style="margin-top:0">Interludes, vie quotidienne, pièces privées. Chaque joueur ne voit que les dossiers visibles de son agent.</p>' : '<p class="sm muted" style="margin-top:0">Ce que vit votre agent entre deux opérations. Vous seul y avez accès.</p>') + dos, 'wide')}</div>`;
 }
 
 /* ------------------------------------------------------------ aides */
@@ -387,6 +434,14 @@ function aidesView() {
    ${list.length ? `<div class="board"><div class="ev">${list.map(card).join('')}</div></div>` : '<div class="empty">Ce dossier est vide.</div>'}`;
 }
 function lightbox() {
+  if (U.lbDos !== null && U.lbDos !== undefined && U.dossier) {
+    const d = D.dossiers.find(x => x.id === U.dossier); const list = d ? d.images.filter(i => i.url) : [];
+    const k = Math.min(U.lbDos, list.length - 1), im = list[k]; if (!im) return '';
+    const n = list.length;
+    return `<div class="lb" role="dialog" aria-modal="true" aria-label="${esc(im.legende || 'Image')}"><div class="bar"><span class="typed" style="font-size:19px">${esc(im.legende || '')}</span><button data-act="lbclose">Fermer</button></div>
+     <div class="img"><img src="${esc(im.url)}" alt="${esc(im.legende)}"></div>
+     <div class="bar">${n > 1 ? `<button data-act="dimg" data-id="${(k - 1 + n) % n}">← Précédente</button><span class="sm">${k + 1} / ${n}</span><button data-act="dimg" data-id="${(k + 1) % n}">Suivante →</button>` : ''}</div></div>`;
+  }
   if (U.lbIll) {
     const cur = D.illus.find(i => i.id === U.lbIll); if (!cur) return '';
     const ss = seancesOf(cur.operation).map(s => s.id);
@@ -461,7 +516,7 @@ function render() {
 function route() {
   const h = location.hash.slice(1);
   const ok = VIEWS.some(v => v[0] === h) || (h === 'mj' && isMJ());
-  U.view = ok ? h : 'tableau'; U.lb = null; U.lbBadge = null; U.lbIll = null; render();
+  U.view = ok ? h : 'tableau'; U.lb = null; U.lbBadge = null; U.lbIll = null; U.lbDos = null; if (U.view !== 'notes') U.dossier = null; render();
 }
 window.addEventListener('hashchange', route);
 
@@ -490,7 +545,13 @@ document.addEventListener('click', async e => {
     case 'openop': U.op = id; location.hash = 'operations'; return;
     case 'filter': U.filter = id; break;
     case 'lb': U.lb = id; break;
-    case 'lbclose': U.lb = null; U.lbBadge = null; U.lbIll = null; break;
+    case 'lbclose': U.lb = null; U.lbBadge = null; U.lbIll = null; U.lbDos = null; break;
+    case 'dossier': U.dossier = id || null; U.lbDos = null; window.scrollTo(0, 0); break;
+    case 'dimg': U.lbDos = +id; break;
+    case 'newdossier': await run(async () => { const d = await api.creerDossier({ agent: id, titre: 'Nouveau dossier', sous_titre: '', texte: '', visible: false, ordre: D.dossiers.filter(x => x.agent === id).length }); await reload(); U.dossier = d.id; }); break;
+    case 'dvis': { const d = D.dossiers.find(x => x.id === id); await run(async () => { await api.majDossier(id, { visible: !d.visible }); await reload(); }, d.visible ? 'Dossier masqué' : 'Dossier visible par le joueur'); break; }
+    case 'ddel': { const d = D.dossiers.find(x => x.id === id); await run(async () => { await api.supprDossier(d); U.dossier = null; await reload(); }, 'Dossier supprimé'); break; }
+    case 'dimgdel': { const d = D.dossiers.find(x => x.id === U.dossier), im = d.images[+id]; await run(async () => { if (im.path) await api.retirerFichierDossier(im.path); d.images.splice(+id, 1); await api.imagesDossier(d.id, d.images); await reload(); }, 'Image retirée'); break; }
     case 'ill': U.lbIll = id; break;
     case 'delill': { const il = D.illus.find(x => x.id === id); await run(async () => { await api.supprIllustration(il); await reload(); }, 'Image retirée'); break; }
     case 'badge': U.lbBadge = id; break;
@@ -519,6 +580,23 @@ document.addEventListener('click', async e => {
     case 'delaide': { const h = D.aides.find(x => x.id === id); await run(async () => { await api.supprAide(h); await reload(); }, 'Pièce supprimée'); break; }
     case 'import': {
       let liste; try { liste = JSON.parse(document.getElementById('imp').value); } catch (err) { toast('Données illisibles : ' + err.message, true); return; }
+      if (liste && !Array.isArray(liste) && Array.isArray(liste.dossiers_perso)) {
+        t.disabled = true; t.textContent = 'Import en cours…';
+        await run(async () => {
+          let n = 0, manquants = [];
+          for (const x of liste.dossiers_perso) {
+            const a = D.agents.find(y => (x.foundry_id && y.foundry_id === x.foundry_id)) || D.agents.find(y => y.data.name.toLowerCase() === String(x.agent || '').toLowerCase());
+            if (!a) { manquants.push(x.agent || x.foundry_id); continue; }
+            const d = await api.creerDossier({ agent: a.id, titre: x.titre || 'Dossier', sous_titre: x.sous_titre || '', texte: x.texte || '', visible: !!x.visible, ordre: Number.isFinite(x.ordre) ? x.ordre : 0 });
+            const imgs = [];
+            for (const im of x.images || []) if (okImg(im.image)) imgs.push({ path: await api.envoyerImageDossier(d.id, dataUrlFile(im.image, im.fichier)), legende: im.legende || '' });
+            if (imgs.length) await api.imagesDossier(d.id, imgs);
+            n++;
+          }
+          await reload(); toast(n + ' dossier(s) importé(s)' + (manquants.length ? ' · agents introuvables : ' + manquants.join(', ') : ''), !!manquants.length); location.hash = 'notes';
+        });
+        return;
+      }
       if (liste && !Array.isArray(liste) && liste.illustrations_pour) {
         const nom = String(liste.illustrations_pour).trim().toLowerCase();
         const o = D.ops.find(y => y.titre.trim().toLowerCase() === nom && (!liste.groupe || y.groupe === liste.groupe)) || D.ops.find(y => y.titre.trim().toLowerCase() === nom);
@@ -575,6 +653,11 @@ document.addEventListener('input', e => {
   } else if (ds.se && ds.sf) {
     const s = D.seances.find(x => x.id === ds.se); s[ds.sf] = ds.sf === 'numero' ? (+t.value || 1) : (t.value || (ds.sf === 'date' ? null : ''));
     later('se' + s.id + ds.sf, () => api.majSeance(s.id, { [ds.sf]: s[ds.sf] }));
+  } else if (ds.dos && ds.df) {
+    const d = D.dossiers.find(x => x.id === ds.dos); d[ds.df] = t.value; later('d' + d.id + ds.df, () => api.majDossier(d.id, { [ds.df]: d[ds.df] }));
+    if (ds.df === 'texte') { const pv = document.querySelector('.dossier-perso > .dtext'); if (pv) pv.innerHTML = richText(t.value); }
+  } else if (ds.dimg !== undefined && U.dossier) {
+    const d = D.dossiers.find(x => x.id === U.dossier); d.images[+ds.dimg].legende = t.value; later('di' + d.id, () => api.imagesDossier(d.id, d.images));
   } else if (ds.ill) {
     const il = D.illus.find(x => x.id === ds.ill); il.legende = t.value; later('il' + il.id, () => api.majIllustration(il.id, { legende: il.legende }));
   } else if (ds.g) {
@@ -588,6 +671,10 @@ document.addEventListener('change', async e => {
   if (t.dataset.portrait) {
     const a = agentById(t.dataset.portrait); if (!a || !canEdit(a) || !t.files[0]) return;
     await run(async () => { a.portrait = await imageFile(t.files[0], 360, 450, true); await api.majAgent(a.id, { portrait: a.portrait }); }, 'Photo enregistrée');
+    render();
+  } else if (t.dataset.dosimg) {
+    const d = D.dossiers.find(x => x.id === t.dataset.dosimg), files = [...t.files]; if (!d || !files.length) return;
+    await run(async () => { for (const f of files) { const path = await api.envoyerImageDossier(d.id, await imageFile(f, 1800, 1800, false)); d.images.push({ path, legende: '' }); } await api.imagesDossier(d.id, d.images); await reload(); }, files.length > 1 ? 'Images ajoutées' : 'Image ajoutée');
     render();
   } else if (t.dataset.illop) {
     const files = [...t.files]; if (!files.length) return;
@@ -605,11 +692,11 @@ document.addEventListener('change', async e => {
 });
 
 document.addEventListener('keydown', e => {
-  if (!U.lb && !U.lbBadge && !U.lbIll) return;
-  if (e.key === 'Escape') { U.lb = null; U.lbBadge = null; U.lbIll = null; render(); return; }
+  if (!U.lb && !U.lbBadge && !U.lbIll && !(U.lbDos !== null && U.lbDos !== undefined)) return;
+  if (e.key === 'Escape') { U.lb = null; U.lbBadge = null; U.lbIll = null; U.lbDos = null; render(); return; }
   if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') {
-    const b = [...document.querySelectorAll('.lb [data-act="lb"], .lb [data-act="ill"]')]; const btn = e.key === 'ArrowRight' ? b[1] : b[0];
-    if (btn) { if (U.lbIll) U.lbIll = btn.dataset.id; else U.lb = btn.dataset.id; render(); }
+    const b = [...document.querySelectorAll('.lb [data-act="lb"], .lb [data-act="ill"], .lb [data-act="dimg"]')]; const btn = e.key === 'ArrowRight' ? b[1] : b[0];
+    if (btn) { if (btn.dataset.act === 'dimg') U.lbDos = +btn.dataset.id; else if (U.lbIll) U.lbIll = btn.dataset.id; else U.lb = btn.dataset.id; render(); }
   }
 });
 document.addEventListener('visibilitychange', () => {

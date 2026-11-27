@@ -90,6 +90,30 @@ window.createApi = function (sb) {
       ok(await sb.from('illustrations').delete().eq('id', il.id));
     },
 
+    async dossiersPerso() {
+      const rows = ok(await sb.from('dossiers_perso').select('*').order('ordre').order('cree_le'));
+      const paths = rows.flatMap(r => (r.images || []).map(i => i.path).filter(Boolean)), urls = {};
+      if (paths.length) {
+        const { data } = await sb.storage.from('personnel').createSignedUrls(paths, 3600 * 6);
+        (data || []).forEach(d => { if (d.signedUrl) urls[d.path] = d.signedUrl; });
+      }
+      return rows.map(r => ({ ...r, images: (r.images || []).map(i => ({ ...i, url: urls[i.path] || null })) }));
+    },
+    async creerDossier(f) { return ok(await sb.from('dossiers_perso').insert(f).select().single()); },
+    async majDossier(id, f) { ok(await sb.from('dossiers_perso').update(f).eq('id', id)); },
+    async supprDossier(d) {
+      const paths = (d.images || []).map(i => i.path).filter(Boolean);
+      if (paths.length) await sb.storage.from('personnel').remove(paths);
+      ok(await sb.from('dossiers_perso').delete().eq('id', d.id));
+    },
+    async imagesDossier(id, images) { ok(await sb.from('dossiers_perso').update({ images: images.map(({ path, legende }) => ({ path, legende: legende || '' })) }).eq('id', id)); },
+    async envoyerImageDossier(id, file) {
+      const path = `${id}/${Date.now()}-${safe(file.name || 'image.jpg')}`;
+      ok(await sb.storage.from('personnel').upload(path, file, { contentType: file.type || 'image/jpeg' }));
+      return path;
+    },
+    async retirerFichierDossier(path) { await sb.storage.from('personnel').remove([path]); },
+
     async notesCommunes() { return ok(await sb.from('notes_communes').select('*')); },
     async sauverNoteCommune(groupe, texte, par) {
       ok(await sb.from('notes_communes').upsert({ groupe, texte, modifie_par: par, modifie_le: now() }));

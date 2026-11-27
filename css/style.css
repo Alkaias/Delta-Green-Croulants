@@ -406,3 +406,18 @@ input.score{-webkit-text-fill-color:var(--mint)}
 .folder .fcount{position:absolute;left:18px;bottom:18px;font:14px Archivo,sans-serif;color:#cfd8c0}
 .folder .fstamp{position:absolute;right:16px;bottom:16px;border:2px solid #ff8a7f;color:#ff8a7f;font:13px "Special Elite",monospace;padding:1px 8px;transform:rotate(-6deg)}
 .crumbs{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:12px}
+
+/* ===================== dossiers personnels ===================== */
+.folders .folder.sm .fbody{height:170px}
+.folder.sm .fname{bottom:22px;font-size:20px}
+.dagent{padding:14px 0 26px;border-bottom:1px dashed var(--line)}
+.dagent:last-child{border-bottom:0}
+.dagent .folders{padding-top:30px}
+.dossier-perso>h1{margin-bottom:18px}
+.dossier-perso .pics{margin-top:4px}
+.dtext{font-size:17px;line-height:1.75;max-width:70ch}
+.dtext p{margin:0 0 1.05em}
+.dtext p:first-of-type::first-letter{font:52px/0.9 "Special Elite",monospace;float:left;margin:6px 10px 0 0;color:var(--mint)}
+.dh{font:22px "Special Elite",monospace;margin:1.6em 0 .6em;color:var(--mint);border-bottom:1px solid var(--line);padding-bottom:6px}
+.conseq{border:1.5px solid var(--brass);background:rgba(140,122,69,.14);padding:10px 14px;border-radius:4px;margin:1.2em 0;font:16px "Courier Prime",monospace}
+.conseq::before{content:"Conséquence · ";color:#d9c38a;font-weight:700}
