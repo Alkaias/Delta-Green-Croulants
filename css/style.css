@@ -450,3 +450,10 @@ input.score{-webkit-text-fill-color:var(--mint)}
 .prep .ok{color:#6fd39a;font-weight:700}
 .fe.ed textarea{min-height:58px}
 .report .rh.ed input.duree{width:150px}
+
+/* ===================== onglets figés ===================== */
+.tabs{position:sticky;top:0;z-index:12;padding-top:8px;background:linear-gradient(180deg,rgba(6,10,7,.97) 0,rgba(6,10,7,.92) 100%);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+@media(min-width:1330px){.tabs{max-width:none;margin:0;padding-left:calc((100vw - 1240px) / 2);padding-right:calc((100vw - 1240px) / 2)}}
+body:has(.pvbar) .tabs{top:44px}
+html{scroll-padding-top:120px}
+.tabs{box-shadow:0 8px 14px -10px rgba(0,0,0,.8)}

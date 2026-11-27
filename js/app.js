@@ -582,7 +582,8 @@ function render() {
 function route() {
   const h = location.hash.slice(1);
   const ok = VIEWS.some(v => v[0] === h) || (h === 'mj' && isMJ());
-  U.view = ok ? h : 'tableau'; U.lb = U.pendingLb || null; U.pendingLb = null; U.lbBadge = null; U.lbIll = null; U.lbDos = null; if (U.view !== 'notes') U.dossier = null; render();
+  const prev = U.view;
+  U.view = ok ? h : 'tableau'; if (prev !== U.view) window.scrollTo(0, 0); U.lb = U.pendingLb || null; U.pendingLb = null; U.lbBadge = null; U.lbIll = null; U.lbDos = null; if (U.view !== 'notes') U.dossier = null; render();
 }
 window.addEventListener('hashchange', route);
 
