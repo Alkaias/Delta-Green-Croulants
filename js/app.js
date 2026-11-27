@@ -5,7 +5,7 @@ const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': 
 const api = window.API_OVERRIDE || window.createApi(window.supabase.createClient(CONFIG.supabaseUrl, CONFIG.supabaseKey));
 
 /* ------------------------------------------------------------ état */
-const D = { dossiers: [], illus: [], badges: {}, groupes: [], agents: [], secrets: {}, ops: [], seances: [], aides: [], notesC: {}, notePerso: '', profils: [] };
+const D = { prep: {}, dossiers: [], illus: [], badges: {}, groupes: [], agents: [], secrets: {}, ops: [], seances: [], aides: [], notesC: {}, notePerso: '', profils: [] };
 const U = { uid: null, profil: null, discord: '', state: 'loading', err: '', group: null, view: 'tableau', op: null, agent: null, lb: null, filter: 'all', lastLoad: 0, preview: null, savedGroup: null };
 const VIEWS = [['tableau', 'Tableau'], ['agents', 'Agents'], ['operations', 'Opérations'], ['notes', 'Notes'], ['aides', 'Aides de jeu']];
 const STATS = ['FOR', 'CON', 'DEX', 'INT', 'POU', 'CHA'];
@@ -119,6 +119,7 @@ async function reload() {
   const [g, a, o, s, h, n, p, il] = await Promise.all([api.groupes(), api.agents(), api.operations(), api.seances(), api.aides(), api.notesCommunes(), api.profils(), api.illustrations ? api.illustrations().catch(() => []) : []]);
   D.illus = il;
   D.dossiers = api.dossiersPerso ? await api.dossiersPerso().catch(() => []) : [];
+  D.prep = Object.fromEntries((api.preparations ? await api.preparations().catch(() => []) : []).map(x => [x.joueur, x.coches || []]));
   D.groupes = g; D.ops = o; D.seances = s; D.aides = h; D.profils = p;
   D.agents = a.map(x => ({ ...x, data: norm(x.data) })).sort((x, y) => x.data.name.localeCompare(y.data.name));
   D.notesC = Object.fromEntries(n.map(x => [x.groupe, x]));
@@ -185,6 +186,65 @@ function vit(a) {
   return m('PV', a.data.pv.cur, a.data.pv.max, a.data.pv.cur <= 2) + m('VOL', a.data.vol.cur, a.data.vol.max, a.data.vol.cur <= 2)
     + (isMJ() && s ? m('SAN', s.san, s.san_max, s.san <= s.seuil) + `<div class="sm muted">Seuil de rupture : <span class="val">${s.seuil}</span></div>` : '');
 }
+const arrOf = v => Array.isArray(v) ? v : [];
+const lienVal = l => l && l.type && l.titre ? l.type + ':' + l.titre : '';
+function resolveLien(l) {
+  if (!l || !l.type) return null;
+  const t = String(l.titre || '').trim().toLowerCase();
+  if (l.type === 'op') { const o = groupOps().find(x => x.titre.trim().toLowerCase() === t); return o ? { act: 'openop', id: o.id, label: 'Lire le dossier' } : null; }
+  if (l.type === 'piece') { const h = groupAides().find(x => x.titre.trim().toLowerCase() === t && (isMJ() || x.visible)); return h ? { act: 'openpiece', id: h.id, label: 'Voir la pièce' } : null; }
+  if (l.type === 'dossier') { const me = myAgent(); if (!me) return null; const d = D.dossiers.find(x => x.agent === me.id && x.titre.trim().toLowerCase() === t && (isMJ() || x.visible)); return d ? { act: 'opendossier', id: d.id, label: 'Ouvrir mon dossier' } : null; }
+  return null;
+}
+function lienOptions(sel) {
+  const o = groupOps().map(x => ['op:' + x.titre, 'Opération : ' + x.titre]);
+  const p = groupAides().map(x => ['piece:' + x.titre, 'Pièce : ' + x.titre]);
+  const d = [...new Set(D.dossiers.filter(x => groupAgents().some(a => a.id === x.agent)).map(x => x.titre))].map(x => ['dossier:' + x, 'Dossier personnel : ' + x]);
+  const all = [...o, ...p, ...d]; if (sel && !all.some(x => x[0] === sel)) all.push([sel, sel.replace(/^op:/, 'Opération : ').replace(/^piece:/, 'Pièce : ').replace(/^dossier:/, 'Dossier personnel : ') + ' (introuvable pour l’instant)']);
+  return `<option value="">Pas de lien</option>${all.map(([v, l]) => `<option value="${esc(v)}"${v === sel ? ' selected' : ''}>${esc(l)}</option>`).join('')}`;
+}
+const parseLien = v => { if (!v) return null; const k = v.indexOf(':'); return { type: v.slice(0, k), titre: v.slice(k + 1) }; };
+function seanceTxt(g) { return g.prochaine_seance ? new Date(g.prochaine_seance).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long' }) : 'prochaine séance'; }
+const itemText = (it, g) => String(it.texte || '').replace('{seance}', seanceTxt(g)).replace('le prochaine séance', 'à la prochaine séance');
+function daysTo(d) { if (!d) return null; const a = new Date(); a.setHours(0, 0, 0, 0); const b = new Date(d); b.setHours(0, 0, 0, 0); return Math.round((b - a) / 86400000); }
+function sealed(g) {
+  const n = daysTo(g.prochaine_seance);
+  const cd = n === null ? '<div class="countdown"><span class="cdl">Date d’activation à venir</span></div>'
+    : n > 1 ? `<div class="countdown"><span class="cdn">${n}</span><span class="cdl">jours avant activation</span></div>`
+    : n === 1 ? '<div class="countdown"><span class="cdl big">Activation demain</span></div>'
+    : n === 0 ? '<div class="countdown"><span class="cdl big">Activation aujourd’hui</span></div>'
+    : '<div class="countdown"><span class="cdl">Activation imminente</span></div>';
+  return `<div class="sealed"><div class="dosno">Ordre de mission · pli scellé</div>
+    <h2 class="mt"><span class="caviar">OPÉRATION</span> <span class="bar" aria-label="nom caviardé">██████████</span></h2>
+    <span class="stamp big">Activation imminente</span>${cd}
+    ${g.accroche ? `<p class="accroche">${esc(g.accroche)}</p>` : ''}
+    ${isMJ() ? `<label for="acc" style="margin-top:14px">Accroche affichée aux joueurs (facultatif)</label><input id="acc" data-g="accroche" value="${esc(g.accroche || '')}" placeholder="ex. Restez joignables. Valise prête.">
+      <p class="sm muted" style="margin-bottom:0">Ce panneau s’affiche tant qu’aucune opération n’est « En cours ».</p>` : ''}</div>`;
+}
+function filView(g) {
+  const fil = arrOf(g.fil);
+  const lastOp = groupOps().filter(o => o.statut === 'terminee').slice(-1)[0];
+  const title = lastOp ? 'Depuis l’' + lastOp.titre.replace(/^Opération\s+/i, 'opération ') : 'Depuis la dernière opération';
+  const lis = fil.map((e, i) => { const r = resolveLien(e.lien); return isMJ()
+    ? `<li class="fe ed"><input data-fil="${i}" data-ff="date" value="${esc(e.date)}" aria-label="Date" placeholder="Date"><textarea data-fil="${i}" data-ff="texte" aria-label="Texte" rows="2">${esc(e.texte)}</textarea>
+       <div class="row"><select data-fil="${i}" data-ff="lien" aria-label="Lien" style="flex:1 1 200px">${lienOptions(lienVal(e.lien))}</select><button class="small danger" data-act="fildel" data-id="${i}" data-confirm>Retirer</button></div></li>`
+    : `<li class="fe"><span class="fd">${esc(e.date)}</span><span class="ft">${esc(e.texte)}${r ? ` <button class="lnk" data-act="${r.act}" data-id="${r.id}">${r.label} →</button>` : ''}</span></li>`; }).join('');
+  return panel('motiv', title, `${fil.length ? `<ol class="fil">${lis}</ol>` : '<p class="muted">Rien à signaler.</p>'}${isMJ() ? '<button class="small" data-act="filadd">+ Événement</button><p class="sm muted">Les liens vers un dossier personnel mènent chaque joueur vers le sien, s’il est visible.</p>' : ''}`);
+}
+function prepView(g) {
+  const items = arrOf(g.checklist);
+  if (isMJ()) {
+    const team = groupAgents().filter(a => a.joueur);
+    const editor = items.map((it, i) => `<li class="fe ed"><input data-chk="${i}" data-cf="texte" value="${esc(it.texte)}" aria-label="Élément"><div class="row"><select data-chk="${i}" data-cf="lien" aria-label="Lien" style="flex:1 1 200px">${lienOptions(lienVal(it.lien))}</select><button class="small danger" data-act="chkdel" data-id="${i}" data-confirm>Retirer</button></div></li>`).join('');
+    const grid = team.length && items.length ? `<table class="stack prep"><thead><tr><th>Agent</th>${items.map((it, i) => `<th>${i + 1}</th>`).join('')}</tr></thead><tbody>${team.map(a => { const c = D.prep[a.joueur] || []; return `<tr><td>${esc(a.data.name)}</td>${items.map(it => `<td class="n">${c.includes(itemText(it, g)) ? '<span class="ok">✔</span>' : '<span class="muted">—</span>'}</td>`).join('')}</tr>`; }).join('')}</tbody></table>` : '<p class="muted sm">Aucun joueur accrédité pour l’instant.</p>';
+    return panel('skills', 'Avant l’activation', `${grid}<h4 class="subh4">Éléments (1, 2, 3…)</h4><ol class="fil">${editor}</ol><button class="small" data-act="chkadd">+ Élément</button><p class="sm muted">« {seance} » est remplacé par la date de la prochaine séance. Si tu changes la date, la confirmation de présence est à refaire.</p>`);
+  }
+  const me = myAgent(); const uid = U.preview ? (me && me.joueur) : U.uid; const c = (uid && D.prep[uid]) || [];
+  const lis = items.map((it, i) => { const t = itemText(it, g), r = resolveLien(it.lien), on = c.includes(t);
+    return `<li class="chk${on ? ' on' : ''}"><label><input type="checkbox" data-prep="${esc(t)}"${on ? ' checked' : ''}${U.preview ? ' disabled' : ''}><span>${esc(t)}</span></label>${r ? `<button class="lnk" data-act="${r.act}" data-id="${r.id}">${r.label} →</button>` : ''}</li>`; }).join('');
+  const done = items.filter(it => c.includes(itemText(it, g))).length;
+  return panel('skills', 'Avant l’activation', items.length ? `<p class="sm muted" style="margin-top:0">${done} sur ${items.length} · le meneur voit vos réponses.</p><ul class="chks">${lis}</ul>` : '<p class="muted">Rien à préparer.</p>');
+}
 function tableau() {
   const g = groupById(G()), cur = groupOps().find(o => o.statut === 'en_cours');
   const ss = cur ? seancesOf(cur.id) : [], last = ss[ss.length - 1];
@@ -201,8 +261,9 @@ function tableau() {
     : (team.length ? `<div class="acards">${team.map(acard).join('')}</div>` : '<p class="muted">Aucun agent.</p>');
   return `<div class="hd"><h1 class="grp">${esc(g.nom)}${g.annee ? `<span class="yr">${esc(g.annee)}</span>` : ''}</h1></div>
   <div class="dash">
-   ${panel('motiv', 'Opération en cours', mission, 'mission')}
+   ${cur ? panel('motiv', 'Opération en cours', mission, 'mission') : panel('key', 'Prochaine opération', sealed(g), 'mission red')}
    ${panel('cal', 'Prochaine séance', cal + (isMJ() ? `<label for="nx" style="margin-top:14px">Modifier la date</label><input id="nx" type="datetime-local" data-in="next" value="${esc(toLocalInput(g.prochaine_seance))}">` : ''), 'calp')}
+   ${cur ? '' : filView(g) + prepView(g)}
    ${panel(me ? 'person' : 'team', me ? 'Votre agent' : 'Agents de la cellule', agentsBody, 'wide')}
    ${panel('photo', 'Dernières pièces versées au dossier', recent.length ? `<div class="board"><div class="ev">${recent.map(card).join('')}</div></div>` : '<div class="empty">Aucune pour l’instant.</div>', 'wide')}
   </div>`;
@@ -520,7 +581,7 @@ function render() {
 function route() {
   const h = location.hash.slice(1);
   const ok = VIEWS.some(v => v[0] === h) || (h === 'mj' && isMJ());
-  U.view = ok ? h : 'tableau'; U.lb = null; U.lbBadge = null; U.lbIll = null; U.lbDos = null; if (U.view !== 'notes') U.dossier = null; render();
+  U.view = ok ? h : 'tableau'; U.lb = U.pendingLb || null; U.pendingLb = null; U.lbBadge = null; U.lbIll = null; U.lbDos = null; if (U.view !== 'notes') U.dossier = null; render();
 }
 window.addEventListener('hashchange', route);
 
@@ -543,6 +604,12 @@ document.addEventListener('click', async e => {
     case 'refresh': U.state = 'loading'; render(); try { await reload(); } catch (err) { U.state = 'error'; U.err = err.message; } route(); return;
     case 'preview-on': { const a = agentById(document.getElementById('pv-a').value); if (!a) return; U.savedGroup = U.group; U.preview = a.id; U.group = a.groupe; U.agent = a.id; U.op = null; U.filter = 'all'; location.hash = 'tableau'; route(); window.scrollTo(0, 0); return; }
     case 'preview-off': U.preview = null; U.group = U.savedGroup || U.group; U.agent = null; U.op = null; U.filter = 'all'; location.hash = 'mj'; route(); return;
+    case 'openpiece': { const h = D.aides.find(x => x.id === id); if (!h) return; U.filter = h.operation || ''; U.pendingLb = id; location.hash = 'aides'; return; }
+    case 'opendossier': U.dossier = id; location.hash = 'notes'; window.scrollTo(0, 0); return;
+    case 'filadd': { const g = groupById(G()); g.fil = [...arrOf(g.fil), { date: '', texte: '' }]; await run(() => api.majGroupe(g.id, { fil: g.fil })); break; }
+    case 'fildel': { const g = groupById(G()); g.fil = arrOf(g.fil).filter((_, i) => i !== +id); await run(() => api.majGroupe(g.id, { fil: g.fil }), 'Événement retiré'); break; }
+    case 'chkadd': { const g = groupById(G()); g.checklist = [...arrOf(g.checklist), { texte: '' }]; await run(() => api.majGroupe(g.id, { checklist: g.checklist })); break; }
+    case 'chkdel': { const g = groupById(G()); g.checklist = arrOf(g.checklist).filter((_, i) => i !== +id); await run(() => api.majGroupe(g.id, { checklist: g.checklist }), 'Élément retiré'); break; }
     case 'goagent': U.agent = id; location.hash = 'agents'; return;
     case 'agent': U.agent = id; break;
     case 'op': U.op = id; break;
@@ -662,6 +729,10 @@ document.addEventListener('input', e => {
     if (ds.df === 'texte') { const pv = document.querySelector('.dossier-perso > .dtext'); if (pv) pv.innerHTML = richText(t.value); }
   } else if (ds.dimg !== undefined && U.dossier) {
     const d = D.dossiers.find(x => x.id === U.dossier); d.images[+ds.dimg].legende = t.value; later('di' + d.id, () => api.imagesDossier(d.id, d.images));
+  } else if (ds.fil !== undefined && ds.ff && ds.ff !== 'lien') {
+    const g = groupById(G()); g.fil[+ds.fil][ds.ff] = t.value; later('fil' + g.id, () => api.majGroupe(g.id, { fil: g.fil }));
+  } else if (ds.chk !== undefined && ds.cf === 'texte') {
+    const g = groupById(G()); g.checklist[+ds.chk].texte = t.value; later('chk' + g.id, () => api.majGroupe(g.id, { checklist: g.checklist }));
   } else if (ds.ill) {
     const il = D.illus.find(x => x.id === ds.ill); il.legende = t.value; later('il' + il.id, () => api.majIllustration(il.id, { legende: il.legende }));
   } else if (ds.g) {
@@ -676,6 +747,14 @@ document.addEventListener('change', async e => {
     const a = agentById(t.dataset.portrait); if (!a || !canEdit(a) || !t.files[0]) return;
     await run(async () => { a.portrait = await imageFile(t.files[0], 360, 450, true); await api.majAgent(a.id, { portrait: a.portrait }); }, 'Photo enregistrée');
     render();
+  } else if (t.dataset.fil !== undefined && t.dataset.ff === 'lien') {
+    const g = groupById(G()); g.fil[+t.dataset.fil].lien = parseLien(t.value); await run(() => api.majGroupe(g.id, { fil: g.fil }), 'Lien enregistré');
+  } else if (t.dataset.chk !== undefined && t.dataset.cf === 'lien') {
+    const g = groupById(G()); g.checklist[+t.dataset.chk].lien = parseLien(t.value); await run(() => api.majGroupe(g.id, { checklist: g.checklist }), 'Lien enregistré');
+  } else if (t.dataset.prep !== undefined) {
+    const k = t.dataset.prep, c = new Set(D.prep[U.uid] || []); if (t.checked) c.add(k); else c.delete(k);
+    D.prep[U.uid] = [...c]; const li = t.closest('.chk'); if (li) li.classList.toggle('on', t.checked);
+    await run(() => api.sauverPreparation(U.uid, D.prep[U.uid]), t.checked ? 'C’est noté' : 'Enregistré');
   } else if (t.dataset.dosimg) {
     const d = D.dossiers.find(x => x.id === t.dataset.dosimg), files = [...t.files]; if (!d || !files.length) return;
     await run(async () => { for (const f of files) { const path = await api.envoyerImageDossier(d.id, await imageFile(f, 1800, 1800, false)); d.images.push({ path, legende: '' }); } await api.imagesDossier(d.id, d.images); await reload(); }, files.length > 1 ? 'Images ajoutées' : 'Image ajoutée');
@@ -691,7 +770,7 @@ document.addEventListener('change', async e => {
     render();
   } else if (t.id === 'impf' && t.files[0]) { document.getElementById('imp').value = await t.files[0].text(); toast('Fichier chargé : clique sur Importer');
   } else if (t.dataset.in === 'group') { U.group = t.value; U.agent = null; U.op = null; U.filter = 'all'; render(); }
-  else if (t.dataset.in === 'next') { const g = groupById(G()); g.prochaine_seance = t.value ? new Date(t.value).toISOString() : null; await run(() => api.majGroupe(g.id, { prochaine_seance: g.prochaine_seance }), 'Enregistré'); }
+  else if (t.dataset.in === 'next') { const g = groupById(G()); g.prochaine_seance = t.value ? new Date(t.value).toISOString() : null; await run(() => api.majGroupe(g.id, { prochaine_seance: g.prochaine_seance }), 'Enregistré'); render(); }
   else if (t.dataset.opst) { const o = opById(t.dataset.opst); o.statut = t.value; await run(() => api.majOp(o.id, { statut: o.statut }), 'Statut enregistré'); render(); }
 });
 

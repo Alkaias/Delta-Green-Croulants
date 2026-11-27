@@ -114,6 +114,9 @@ window.createApi = function (sb) {
     },
     async retirerFichierDossier(path) { await sb.storage.from('personnel').remove([path]); },
 
+    async preparations() { return ok(await sb.from('preparation').select('*')); },
+    async sauverPreparation(uid, coches) { ok(await sb.from('preparation').upsert({ joueur: uid, coches, modifie_le: now() })); },
+
     async notesCommunes() { return ok(await sb.from('notes_communes').select('*')); },
     async sauverNoteCommune(groupe, texte, par) {
       ok(await sb.from('notes_communes').upsert({ groupe, texte, modifie_par: par, modifie_le: now() }));

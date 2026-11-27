@@ -424,3 +424,28 @@ input.score{-webkit-text-fill-color:var(--mint)}
 .codename{margin:0 0 6px;font:19px "Special Elite",monospace;color:var(--stamp);letter-spacing:.02em}
 .grp{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px}
 .yr{font:600 clamp(18px,2.2vw,24px) "Courier Prime",monospace;color:var(--stamp);border:2px solid currentColor;padding:2px 12px;border-radius:3px;transform:rotate(-2deg);display:inline-block;align-self:center}
+
+/* ===================== tableau d'attente ===================== */
+.sealed{position:relative}
+.sealed .mt{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:baseline}
+.sealed .bar{background:#000;color:#000;border-radius:2px;padding:0 6px;letter-spacing:-.05em;box-shadow:0 0 0 1px #2d4033;user-select:none}
+.stamp.big{font-size:18px;margin:14px 0 6px;border-width:3px}
+.countdown{display:flex;align-items:baseline;gap:12px;margin:14px 0 4px}
+.countdown .cdn{font:72px/1 "Special Elite",monospace;color:var(--mint);text-shadow:0 0 18px var(--glow)}
+.countdown .cdl{font:18px "Courier Prime",monospace;color:var(--muted)}
+.countdown .cdl.big{font:26px "Special Elite",monospace;color:var(--stamp)}
+.accroche{font:20px/1.4 "Special Elite",monospace;color:var(--ink);border-left:3px solid var(--stamp);padding:4px 0 4px 14px;margin:16px 0 0}
+.fil{list-style:none;margin:0;padding:0 0 0 18px;border-left:2px solid #3f6b52}
+.fe{position:relative;padding:0 0 18px 14px}
+.fe::before{content:"";position:absolute;left:-25px;top:7px;width:12px;height:12px;border-radius:50%;background:var(--paper);border:2px solid #6fa588}
+.fe .fd{display:block;font:15px "Courier Prime",monospace;color:var(--stamp);margin-bottom:2px}
+.fe .ft{display:block;line-height:1.5}
+.fe.ed{display:grid;gap:6px}
+.lnk{min-height:0;padding:0;border:0;background:none;color:#8fd1ad;font-weight:600;text-decoration:underline;text-underline-offset:3px;cursor:pointer;display:inline}
+.chks{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.chk{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;justify-content:space-between;padding:10px 12px;border:1px solid var(--line);border-radius:4px;background:var(--paper2)}
+.chk label{display:flex;gap:12px;align-items:center;margin:0;color:var(--ink);font-size:16px;cursor:pointer}
+.chk input{width:24px;height:24px;accent-color:#3d7a55;flex:none}
+.chk.on{border-color:#3f6b52}.chk.on span{text-decoration:line-through;text-decoration-color:rgba(219,230,218,.5);color:var(--muted)}
+.prep .ok{color:#6fd39a;font-weight:700}
+.fe.ed textarea{min-height:58px}
