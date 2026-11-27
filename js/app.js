@@ -681,7 +681,7 @@ document.addEventListener('click', async e => {
       }
       if (liste && !Array.isArray(liste) && liste.operation) {
         const dossier = liste; t.disabled = true; t.textContent = 'Import en cours…';
-        await run(async () => { const o = await importOperation(dossier); await reload(); U.op = o.id; toast('Opération importée'); location.hash = 'operations'; });
+        await run(async () => { const o = await importOperation(dossier); await reload(); if (o.groupe && D.groupes.some(g => g.id === o.groupe)) U.group = o.groupe; U.op = o.id; toast('Opération importée'); location.hash = 'operations'; });
         return;
       }
       if (!Array.isArray(liste)) { toast('Données illisibles : fichier non reconnu', true); return; }
