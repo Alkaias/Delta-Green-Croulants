@@ -431,3 +431,5 @@ create policy preparation_maj on public.preparation for update to authenticated
 
 
 alter table public.seances add column if not exists duree text not null default '';
+create or replace function public.ping() returns int language sql stable as $$ select 1 $$;
+grant execute on function public.ping() to anon, authenticated;

@@ -62,7 +62,7 @@ recharger avec Ctrl+F5 (cache du navigateur).
 ### Ordre des scripts
 - Nouvelle base : coller `schema.sql` en entier dans **SQL Editor**, puis appliquer seulement les parties
   « contenu » des migrations si l'on veut le pré-remplissage de la Cellule K (migrations 04 et 05).
-- Base existante : appliquer les migrations manquantes dans l'ordre (01 → 06). Toutes sont rejouables.
+- Base existante : appliquer les migrations manquantes dans l'ordre (01 → 07). Toutes sont rejouables.
 - Supabase affiche un avertissement « destructive operations » à cause des `drop policy if exists` :
   c'est attendu, aucune donnée n'est supprimée.
 
@@ -72,7 +72,7 @@ recharger avec Ctrl+F5 (cache du navigateur).
 - Dans l'application Discord, la redirection autorisée est `https://vnsdvtedgkshwbgluepo.supabase.co/auth/v1/callback`.
 - **Mise en veille** : l'offre gratuite met le projet en pause après une semaine sans activité. Si cela arrive,
   le restaurer depuis le tableau de bord Supabase (bouton « Restore »). Une tâche automatique de « ping »
-  peut l'éviter (voir section 7).
+  l'évite (voir section 7).
 
 ## 4. Fichiers d'import (Espace MJ → Synchronisation Foundry)
 
@@ -152,7 +152,8 @@ passer par les fichiers comme ci-dessus, ou par « Exporter les données » d'un
   dans Discord, et vérifier que son navigateur est connecté au bon compte sur discord.com.
 - **Sécurité** : seule la clé publique figure dans le dépôt. La clé secrète / service_role et le mot de passe
   de la base ne doivent jamais y être ajoutés.
-- **Mise en veille Supabase** : solution possible, non installée à ce jour : une fonction SQL `ping()` accessible
-  sans connexion, appelée tous les trois jours par une tâche planifiée GitHub Actions.
+- **Mise en veille Supabase** : la fonction SQL `ping()` (migration 07) est appelée tous les trois jours par la tâche
+  GitHub Actions `.github/workflows/garder-supabase-eveille.yml`. GitHub suspend les tâches planifiées d'un dépôt
+  sans aucun commit pendant 60 jours : il suffit alors de la réactiver dans l'onglet Actions.
 - **Visibilité par joueur** : les pièces à conviction sont visibles par tout un groupe ; une pièce destinée à un seul
   joueur se range dans son dossier personnel.
