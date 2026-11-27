@@ -429,3 +429,5 @@ drop policy if exists preparation_maj on public.preparation;
 create policy preparation_maj on public.preparation for update to authenticated
   using (joueur = auth.uid()) with check (joueur = auth.uid());
 
+
+alter table public.seances add column if not exists duree text not null default '';

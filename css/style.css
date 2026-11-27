@@ -449,3 +449,4 @@ input.score{-webkit-text-fill-color:var(--mint)}
 .chk.on{border-color:#3f6b52}.chk.on span{text-decoration:line-through;text-decoration-color:rgba(219,230,218,.5);color:var(--muted)}
 .prep .ok{color:#6fd39a;font-weight:700}
 .fe.ed textarea{min-height:58px}
+.report .rh.ed input.duree{width:150px}

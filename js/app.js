@@ -25,6 +25,7 @@ const canEdit = a => !U.preview && (isMJ() || a.joueur === U.uid);
 const groupAgents = () => D.agents.filter(a => a.groupe === G());
 const groupOps = () => D.ops.filter(o => o.groupe === G() && (!U.preview || o.statut !== 'verrouillee'));
 const groupAides = () => D.aides.filter(h => h.groupe === G() && (!U.preview || (h.visible && (!h.operation || (opById(h.operation) || {}).statut !== 'verrouillee'))));
+const dureeTxt = s => s.duree ? ' · ' + s.duree + ' de jeu' : '';
 const seancesOf = id => D.seances.filter(s => s.operation === id).sort((a, b) => a.numero - b.numero);
 
 /* ------------------------------------------------------------ outils */
@@ -86,7 +87,7 @@ async function importIllus(op, seIds, list) {
 async function importOperation(x) {
   const op = x.operation, groupe = x.groupe && D.groupes.some(g => g.id === x.groupe) ? x.groupe : G();
   const o = await api.creerOp({ groupe, titre: op.titre || 'Opération', statut: op.statut || 'verrouillee', periode: op.periode || '', resume: op.resume || '', ordre: Number.isFinite(op.ordre) ? op.ordre : groupOps().length });
-  for (const s of x.seances || []) await api.creerSeance({ operation: o.id, numero: s.numero || 1, date: s.date || null, compte_rendu: s.compte_rendu || '' });
+  for (const s of x.seances || []) await api.creerSeance({ operation: o.id, numero: s.numero || 1, date: s.date || null, compte_rendu: s.compte_rendu || '', ...(s.duree ? { duree: s.duree } : {}) });
   const seIds = {}; (await api.seances()).filter(s => s.operation === o.id).forEach(s => { seIds[s.numero] = s.id; });
   await importIllus(o.id, seIds, x.illustrations);
   for (const h of x.aides || []) await api.creerAide({ groupe, operation: o.id, titre: h.titre || 'Pièce', visible: !!h.visible }, okImg(h.image) ? dataUrlFile(h.image, h.fichier) : null);
@@ -254,7 +255,7 @@ function tableau() {
   const cal = nd ? `<div class="cal"><span class="cm">${esc(nd.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }))}</span><span class="cd">${nd.getDate()}</span><span class="cw">${esc(nd.toLocaleDateString('fr-FR', { weekday: 'long' }))} · ${esc(nd.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }))}</span></div>`
                  : '<div class="cal off"><span class="cm">Date</span><span class="cd">?</span><span class="cw">à fixer</span></div>';
   const mission = cur ? `<div class="hd" style="margin-bottom:4px"><h2 class="mt">${esc(cur.titre)}</h2>${statusStamp(cur.statut)}</div>${cur.periode ? `<p class="muted sm" style="margin:0 0 12px">${esc(cur.periode)}</p>` : ''}
-     ${last ? `<div class="report"><div class="rh"><span>Rapport de séance n°${last.numero}</span><span>${last.date ? fmtD(last.date) : ''}</span></div><div class="rb clip">${esc(last.compte_rendu)}</div></div>` : '<p class="muted">Aucune séance pour l’instant.</p>'}
+     ${last ? `<div class="report"><div class="rh"><span>Rapport de séance n°${last.numero}${esc(dureeTxt(last))}</span><span>${last.date ? fmtD(last.date) : ''}</span></div><div class="rb clip">${esc(last.compte_rendu)}</div></div>` : '<p class="muted">Aucune séance pour l’instant.</p>'}
      <button class="primary" data-act="openop" data-id="${cur.id}" style="margin-top:14px">Ouvrir le dossier complet</button>` : '<div class="empty">Aucune opération en cours.</div>';
   const acard = a => `<button class="acard" data-act="goagent" data-id="${a.id}">${portrait(a, 'pt lg')}<span class="an"><b>${esc(a.data.name)}</b><span class="sm muted">${esc(a.data.prof)}</span>${vit(a)}</span></button>`;
   const agentsBody = me ? `${acard(me)}${team.length > 1 ? `<h4 class="subh4">Le reste de la cellule</h4><div class="mates">${team.filter(a => a.id !== me.id).map(a => `<button class="mate" data-act="goagent" data-id="${a.id}">${portrait(a, 'pt')}<span>${esc(a.data.name)}</span></button>`).join('')}</div>` : ''}`
@@ -395,7 +396,7 @@ function operations() {
   if (!mj) return `<div class="grid side">${side}<article class="opdoc">${head}
     ${o.resume ? panel('bio', 'Synthèse de l’opération', `<div class="ro-text plain">${esc(o.resume)}</div>`, 'brass') : ''}
     <h2 class="subh">Rapports de séance</h2>
-    ${ss.length ? ss.map(s => { const pics = illusOf(o.id, s.id); return `<article class="report"><div class="rh"><span>Rapport de séance n°${s.numero}</span><span>${fmtD(s.date)}</span></div><div class="rbody">${pics.length ? `<div class="pics">${pics.map(pinFig).join('')}</div>` : ''}<div class="rb">${esc(s.compte_rendu)}</div></div></article>`; }).join('') : '<p class="muted">Aucun rapport pour l’instant.</p>'}
+    ${ss.length ? ss.map(s => { const pics = illusOf(o.id, s.id); return `<article class="report"><div class="rh"><span>Rapport de séance n°${s.numero}${esc(dureeTxt(s))}</span><span>${fmtD(s.date)}</span></div><div class="rbody">${pics.length ? `<div class="pics">${pics.map(pinFig).join('')}</div>` : ''}<div class="rb">${esc(s.compte_rendu)}</div></div></article>`; }).join('') : '<p class="muted">Aucun rapport pour l’instant.</p>'}
     ${piecesHtml}</article></div>`;
   return `<div class="grid side">${side}<article class="opdoc">${head}
     ${panel('bio', 'Fiche de l’opération', `<div class="mjbar"><div style="flex:3 1 260px"><label for="op-t">Titre</label><input id="op-t" class="edit-title" data-op="${o.id}" data-of="titre" value="${esc(o.titre)}"></div>
@@ -405,7 +406,7 @@ function operations() {
      <div class="covered"><span class="sm muted">Couverture</span>${cov ? edFig(cov) : addIll(o.id, null, '+ Image de couverture')}</div>
      <label for="op-r">Synthèse (à remplir quand l’opération est classée)</label><textarea class="ruled" id="op-r" data-op="${o.id}" data-of="resume">${esc(o.resume)}</textarea>`, 'brass')}
     <div class="hd" style="margin-top:26px"><h2 class="subh" style="margin:0">Rapports de séance</h2><button class="primary" data-act="addseance" data-id="${o.id}">+ Nouveau rapport</button></div>
-    ${ss.length ? ss.map(s => `<article class="report"><div class="rh ed"><span class="row">Rapport n°<input type="number" data-se="${s.id}" data-sf="numero" value="${s.numero}" aria-label="Numéro"></span>
+    ${ss.length ? ss.map(s => `<article class="report"><div class="rh ed"><span class="row">Rapport n°<input type="number" data-se="${s.id}" data-sf="numero" value="${s.numero}" aria-label="Numéro"><input class="duree" data-se="${s.id}" data-sf="duree" value="${esc(s.duree || '')}" placeholder="durée, ex. 2h15" aria-label="Durée de jeu"></span>
       <span class="row"><input type="date" data-se="${s.id}" data-sf="date" value="${esc(s.date || '')}" aria-label="Date"><button class="small danger" data-act="delseance" data-id="${s.id}" data-confirm>Supprimer</button></span></div>
       <div class="pics ed">${illusOf(o.id, s.id).map(edFig).join('')}${addIll(o.id, s.id, '+ Image')}</div>
       <textarea class="ruled rb" data-se="${s.id}" data-sf="compte_rendu" aria-label="Compte rendu" placeholder="Ce qui s’est passé pendant la séance…">${esc(s.compte_rendu)}</textarea></article>`).join('') : '<p class="muted">Aucun rapport.</p>'}
