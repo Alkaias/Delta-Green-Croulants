@@ -405,3 +405,5 @@ create policy personnel_maj on storage.objects for update to authenticated
 drop policy if exists personnel_suppr on storage.objects;
 create policy personnel_suppr on storage.objects for delete to authenticated
   using (bucket_id = 'personnel' and public.est_mj());
+
+alter table public.groupes add column if not exists annee text not null default '';

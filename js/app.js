@@ -15,7 +15,8 @@ const realMJ = () => U.profil && U.profil.role === 'mj';
 const isMJ = () => realMJ() && !U.preview;
 const G = () => U.group;
 const agentById = id => D.agents.find(a => a.id === id);
-const groupById = id => D.groupes.find(g => g.id === id) || { id, nom: '—', monde: '' };
+const groupById = id => D.groupes.find(g => g.id === id) || { id, nom: '—', monde: '', annee: '' };
+const groupLabel = g => g.nom + (g.annee ? ' · ' + g.annee : '');
 const opById = id => D.ops.find(o => o.id === id);
 const codeName = d => [d.cellule && 'Cellule ' + d.cellule, d.alias && 'Agent ' + d.alias].filter(Boolean).join(' – ');
 const myAgent = () => U.preview ? agentById(U.preview) : D.agents.find(a => a.joueur === U.uid);
@@ -162,13 +163,13 @@ function header() {
   if (U.preview) {
     const who = playerOf(me) || 'joueur non rattaché';
     return `<div class="pvbar" role="status"><span><b>Aperçu joueur</b> · ce que voit ${esc(who)} (${esc(me.data.name)}). Lecture seule.</span><button class="small" data-act="preview-off">Quitter l’aperçu</button></div>
-    <header class="top"><div class="brand">${EMBLEM(52)}<span>Archives des cellules<small>${esc(groupById(G()).nom)}</small></span></div>
+    <header class="top"><div class="brand">${EMBLEM(52)}<span>Archives des cellules<small>${esc(groupLabel(groupById(G())))}</small></span></div>
     <span class="chip"><span class="av">${initials(who)}</span><span>${esc(who)}<br><span style="opacity:.7;font-size:13px">${esc(me.data.name)}</span></span></span></header>`;
   }
   const av = okImg(U.profil.avatar) ? `<img class="av" src="${esc(U.profil.avatar)}" alt="">` : `<span class="av"${isMJ() ? ' style="background:#b3261e"' : ''}>${isMJ() ? 'MJ' : initials(U.profil.discord)}</span>`;
   return `<div class="classif" aria-hidden="true"><span>Confidentiel · Accès restreint · Ne pas diffuser · Confidentiel · Accès restreint · Ne pas diffuser · Confidentiel · Accès restreint · Ne pas diffuser</span></div>
-  <header class="top"><div class="brand">${EMBLEM(52)}<span>Archives des cellules<small>${isMJ() ? 'Meneur de jeu' : esc(groupById(G()).nom)}</small></span></div>
-   ${isMJ() ? `<label class="chip" style="margin:0">Groupe <select data-in="group" aria-label="Groupe affiché">${D.groupes.map(x => `<option value="${esc(x.id)}"${x.id === U.group ? ' selected' : ''}>${esc(x.nom)}</option>`).join('')}</select></label>` : ''}
+  <header class="top"><div class="brand">${EMBLEM(52)}<span>Archives des cellules<small>${isMJ() ? 'Meneur de jeu' : esc(groupLabel(groupById(G())))}</small></span></div>
+   ${isMJ() ? `<label class="chip" style="margin:0">Groupe <select data-in="group" aria-label="Groupe affiché">${D.groupes.map(x => `<option value="${esc(x.id)}"${x.id === U.group ? ' selected' : ''}>${esc(groupLabel(x))}</option>`).join('')}</select></label>` : ''}
    <span class="chip">${av}<span>${esc(U.profil.discord)}<br><span style="opacity:.7;font-size:13px">${isMJ() ? 'Accès complet' : esc(me ? me.data.name : 'Sans agent')}</span></span></span>
    <button class="small" data-act="logout">Se déconnecter</button></header>`;
 }
@@ -198,7 +199,7 @@ function tableau() {
   const acard = a => `<button class="acard" data-act="goagent" data-id="${a.id}">${portrait(a, 'pt lg')}<span class="an"><b>${esc(a.data.name)}</b><span class="sm muted">${esc(a.data.prof)}</span>${vit(a)}</span></button>`;
   const agentsBody = me ? `${acard(me)}${team.length > 1 ? `<h4 class="subh4">Le reste de la cellule</h4><div class="mates">${team.filter(a => a.id !== me.id).map(a => `<button class="mate" data-act="goagent" data-id="${a.id}">${portrait(a, 'pt')}<span>${esc(a.data.name)}</span></button>`).join('')}</div>` : ''}`
     : (team.length ? `<div class="acards">${team.map(acard).join('')}</div>` : '<p class="muted">Aucun agent.</p>');
-  return `<div class="hd"><h1>${esc(g.nom)}</h1><span class="muted sm">${esc(g.monde)}</span></div>
+  return `<div class="hd"><h1 class="grp">${esc(g.nom)}${g.annee ? `<span class="yr">${esc(g.annee)}</span>` : ''}</h1></div>
   <div class="dash">
    ${panel('motiv', 'Opération en cours', mission, 'mission')}
    ${panel('cal', 'Prochaine séance', cal + (isMJ() ? `<label for="nx" style="margin-top:14px">Modifier la date</label><input id="nx" type="datetime-local" data-in="next" value="${esc(toLocalInput(g.prochaine_seance))}">` : ''), 'calp')}
@@ -502,7 +503,7 @@ function mj() {
    ${panel('person', 'Voir comme un joueur', `<p class="sm muted" style="margin-top:0">Affiche le site tel que le voit le joueur d’un agent : sans SAN, sans opérations verrouillées ni aides cachées.</p>
      ${D.agents.length ? `<div class="row"><select id="pv-a" aria-label="Agent" style="flex:1 1 220px">${opts(false)}</select><button class="primary small" data-act="preview-on">Voir comme ce joueur</button></div>` : '<p class="muted">Aucun agent.</p>'}`, 'wide brass')}
    ${panel('key', 'Accréditations' + (pend.length ? ` <span class="badge">${pend.length}</span>` : ''), accr, 'wide')}
-   ${panel('stats', 'Groupe affiché', `<div class="grid" style="gap:12px"><div><label for="g-n">Nom</label><input id="g-n" data-g="nom" value="${esc(g.nom)}"></div><div><label for="g-m">Monde Foundry</label><input id="g-m" data-g="monde" value="${esc(g.monde)}"></div></div><p class="sm muted">Change de groupe avec le menu en haut de la page.</p>`)}
+   ${panel('stats', 'Groupe affiché', `<div class="grid" style="gap:12px"><div><label for="g-n">Nom</label><input id="g-n" data-g="nom" value="${esc(g.nom)}"></div><div><label for="g-a">Année de la campagne</label><input id="g-a" data-g="annee" value="${esc(g.annee || '')}" placeholder="ex. 2011"></div><div><label for="g-m">Monde Foundry</label><input id="g-m" data-g="monde" value="${esc(g.monde)}"></div></div><p class="sm muted">Change de groupe avec le menu en haut de la page.</p>`)}
    ${panel('person', 'Nouvel agent', `<label for="na">Nom</label><div class="row"><input id="na" style="flex:1 1 200px" placeholder="Nom de l’agent"><button class="small primary" data-act="newagent">Créer</button></div><p class="sm muted">Il rejoint ${esc(g.nom)}. Tu pourras compléter sa fiche dans l’onglet Agents.</p>`)}
    ${panel('pulse', 'Agents et santé mentale', san, 'wide red')}
    ${panel('photo', 'Aides de jeu', aidesHtml, 'wide')}

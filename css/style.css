@@ -422,3 +422,5 @@ input.score{-webkit-text-fill-color:var(--mint)}
 .conseq{border:1.5px solid var(--brass);background:rgba(140,122,69,.14);padding:10px 14px;border-radius:4px;margin:1.2em 0;font:16px "Courier Prime",monospace}
 .conseq::before{content:"Conséquence · ";color:#d9c38a;font-weight:700}
 .codename{margin:0 0 6px;font:19px "Special Elite",monospace;color:var(--stamp);letter-spacing:.02em}
+.grp{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px}
+.yr{font:600 clamp(18px,2.2vw,24px) "Courier Prime",monospace;color:var(--stamp);border:2px solid currentColor;padding:2px 12px;border-radius:3px;transform:rotate(-2deg);display:inline-block;align-self:center}
